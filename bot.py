@@ -1,32 +1,30 @@
-import discord
 import os
-from dotenv import load_dotenv
-load_dotenv()
+import asyncio
+import discord
 from discord.ext import commands
+from dotenv import load_dotenv
+
+from command_parser import parse
+
+load_dotenv()
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="?", intents=intents)
+bot = commands.Bot(command_prefix=commands.when_mentioned_or("?"), intents=intents)
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-@bot.command()
-async def ping(ctx):
-    await ctx.send("Hello!")
-    
-@bot.command()
-async def say(ctx, *, mssg):
-    await ctx.send(mssg)
-    
-@bot.command()
-async def createevent(ctx, *, details: str):
-    await ctx.send(f"Event created: {details} \nBy {ctx.author}")
-    
-@bot.command()
-async def viewevents(ctx):
-    await ctx.send(f"{ctx.author} Your current future events are: \n4/23/2026 Coffee")
-     
-bot.run(os.getenv("DISCORD_TOKEN")) 
+async def main():
+    token = os.getenv("DISCORD_TOKEN")
+    if token is None:
+        raise RuntimeError("DISCORD_TOKEN is not set in .env")
+
+    async with bot:
+        await bot.load_extension("cogs.calendar_cog")
+        await bot.start(token)
+
+if __name__ == "__main__":
+    asyncio.run(main())

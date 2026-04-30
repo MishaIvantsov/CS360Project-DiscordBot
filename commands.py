@@ -1,9 +1,11 @@
 from __future__ import annotations
 import discord
-from command_parser import ParsedCommand
-from calendar_api import get_events_by_date, add_event, Event, EVENTS
- 
- 
+from calendar_api import get_events_by_date, add_event, delete_event, edit_event, Event, EVENTS
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from command_parser import ParsedCommand
+    
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
     handlers = {
         "edit":   edit,
@@ -21,43 +23,41 @@ async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
  
  
 async def edit(args: list[str], message: discord.Message) -> str:
-    # Aiden's work goes here
-    # Validate argument length
     if len(args) < 3:
         return "⚠️ **Invalid format.** Please use: `@Simon/edit-<event_id>-<field>-<new_value>`"
 
     event_id = args[0]
     field_to_edit = args[1].lower()
-
-    # Join the remaining arguments back together in case the new value contains hyphens.
     new_value = "-".join(args[2:])
 
-    # Prevent users from trying to edit the 'id' or non-existent attributes
     valid_fields = ["title", "date", "time", "location", "description"]
     if field_to_edit not in valid_fields:
         return f"⚠️ **Invalid field.** You can only edit: {', '.join(valid_fields)}"
 
-    # FOR v0.5 DEMO: We removed the calendar_api call to mock the response 
-    # without crashing the bot! It just immediately returns success.
+    updated = edit_event(event_id, **{field_to_edit: new_value})
+
+    if updated is None:
+        return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
 
     return (
         f"✅ **Event Updated!**\n"
-        f"Successfully changed `{field_to_edit}` to `{new_value}` for Event ID **{event_id}**.\n"
-        f"> *Mocking Google Calendar sync and attendee notifications for v0.5.*"
+        f"Successfully changed `{field_to_edit}` to `{new_value}` for Event ID **{event_id}**."
     )
  
  
 async def delete(args: list[str], message: discord.Message) -> str:
-    #@Simon/delete-Lunch
     if len(args) < 1:
         return "⚠️ **Missing Event.** Please use: `@Simon/delete-<event_id>`"
     
     event_id = args[0]
+    success = delete_event(event_id)
+
+    if not success:
+        return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
 
     return (
         f"✅ **Event Deleted!**\n"
-        f"Successfully deleted Event ID **{args[0]}**.\n"
-        f"> *Mocking Google Calendar sync and attendee notifications for v0.5.*"
+        f"Successfully deleted Event ID **{event_id}**."
     )    
  
 async def info(args: list[str], message: discord.Message) -> str:

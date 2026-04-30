@@ -1,7 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
 import discord
-import commands
+from command_parser import ParsedCommand
+from calendar_api import get_events_by_date, add_event, Event, EVENTS
  
  
 @dataclass
@@ -34,3 +34,12 @@ async def parse(text: str, message: discord.Message) -> str:
  
     parsed = ParsedCommand(name=name, command=command, args=args)
     return await commands.handle(parsed, message)
+
+async def help_cmd(args: list[str], message: discord.Message) -> str:
+    return (
+        "**Simon Bot Commands:**\n"
+        "`@Simon/info-<MM.DD.YYYY>` — list events on a date\n"
+        "`@Simon/add-<title>-<date>-<time>-<location>-<description>` — add event\n"
+        "`@Simon/edit-<id>-<field>-<value>` — edit an event\n"
+        "`@Simon/delete-<id>` — delete an event"
+    )

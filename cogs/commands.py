@@ -51,6 +51,16 @@ async def add(args: list[str], message: discord.Message) -> str:
  
  
 async def delete(args: list[str], message: discord.Message) -> str:
-    # Johnny's work goes here
+    #@Simon/delete-Lunch
+    if len(args) < 1:
+        return "⚠️ **Missing Event.** Please use: `@Simon/delete-<event_id>`"
+    
+    event_id = args[0]
+
+    return (
+        f"✅ **Event Deleted!**\n"
+        f"Successfully deleted Event ID **{args[0]}**.\n"
+        f"> *Mocking Google Calendar sync and attendee notifications for v0.5.*"
+    )    
     ...
  

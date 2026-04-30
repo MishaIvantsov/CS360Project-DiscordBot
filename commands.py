@@ -5,7 +5,10 @@ from calendar_api import get_events_by_date, add_event, delete_event, edit_event
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from command_parser import ParsedCommand
-    
+
+
+#FINAL VERSION 0.5
+
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
     handlers = {
         "edit":   edit,

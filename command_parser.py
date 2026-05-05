@@ -1,5 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+import discord
+import commands
 
 
 @dataclass
@@ -9,27 +11,26 @@ class ParsedCommand:
     args: list[str] = field(default_factory=list)
 
 
-def parse(text: str) -> ParsedCommand | None:
+async def parse(text: str, message: discord.Message) -> str:
     text = text.strip()
-
     if not text.startswith("@"):
-        return None
+        return "I didn't understand that. Try `@Simon/help`."
 
     body = text[1:]
     if "/" not in body:
-        return None
+        return "I didn't understand that. Try `@Simon/help`."
 
     name, rest = body.split("/", 1)
     if not name or not rest:
-        return None
+        return "I didn't understand that. Try `@Simon/help`."
 
     parts = rest.split("-")
     command, *args = parts
-
     if not command:
-        return None
+        return "I didn't understand that. Try `@Simon/help`."
 
     while args and args[-1] == "":
         args.pop()
 
-    return ParsedCommand(name=name, command=command, args=args)
+    parsed = ParsedCommand(name=name, command=command, args=args)
+    return await commands.handle(parsed, message)

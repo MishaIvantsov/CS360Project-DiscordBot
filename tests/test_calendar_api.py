@@ -176,6 +176,20 @@ def test_add_event_returns_created_event():
     assert result.title == "Team Lunch"
 
 
+def test_add_event_calls_insert():
+    mock_service = MagicMock()
+
+    # Use .return_value instead of () to avoid registering calls
+    mock_service.events.return_value.insert.return_value.execute.return_value = (
+        SAMPLE_G_EVENT
+    )
+
+    with patch("calendar_api.service", mock_service):
+        add_event(SAMPLE_EVENT)
+
+    mock_service.events().insert.assert_called_once()
+
+
 # --- edit_event() ---
 
 

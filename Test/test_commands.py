@@ -12,6 +12,7 @@ def mock_message():
 
 # handle() dispatch
 
+
 @pytest.mark.asyncio
 async def test_unknown_command(mock_message):
     parsed = ParsedCommand(name="Simon", command="fly", args=[])
@@ -22,6 +23,7 @@ async def test_unknown_command(mock_message):
 
 # Testing help
 
+
 @pytest.mark.asyncio
 async def test_help_returns_all_commands(mock_message):
     parsed = ParsedCommand(name="Simon", command="help", args=[])
@@ -31,6 +33,7 @@ async def test_help_returns_all_commands(mock_message):
 
 
 # Testing info()
+
 
 @pytest.mark.asyncio
 async def test_info_missing_date(mock_message):
@@ -68,6 +71,7 @@ async def test_info_returns_event_details(mock_message):
 
 # Test add()
 
+
 @pytest.mark.asyncio
 async def test_add_missing_args(mock_message):
     parsed = ParsedCommand(name="Simon", command="add", args=["Title", "01.01.2026"])
@@ -80,8 +84,7 @@ async def test_add_success(mock_message):
     args = ["Team Lunch", "05.01.2026", "12:00 PM", "Chipotle", "Team lunch!"]
     parsed = ParsedCommand(name="Simon", command="add", args=args)
 
-    with patch("commands.add_event") as mock_add, \
-         patch("commands.EVENTS", []):
+    with patch("commands.add_event") as mock_add, patch("commands.EVENTS", []):
         result = await handle(parsed, mock_message)
 
     assert "Event Added" in result
@@ -95,8 +98,7 @@ async def test_add_description_with_hyphens(mock_message):
     args = ["Team Lunch", "05.01.2026", "12:00 PM", "Chipotle", "Bring", "your", "own"]
     parsed = ParsedCommand(name="Simon", command="add", args=args)
 
-    with patch("commands.add_event") as mock_add, \
-         patch("commands.EVENTS", []):
+    with patch("commands.add_event") as mock_add, patch("commands.EVENTS", []):
         result = await handle(parsed, mock_message)
 
     assert "Event Added" in result
@@ -106,6 +108,7 @@ async def test_add_description_with_hyphens(mock_message):
 
 
 # Test delete()
+
 
 @pytest.mark.asyncio
 async def test_delete_missing_id(mock_message):
@@ -134,6 +137,7 @@ async def test_delete_success(mock_message):
 
 # Test edit()
 
+
 @pytest.mark.asyncio
 async def test_edit_missing_args(mock_message):
     parsed = ParsedCommand(name="Simon", command="edit", args=["001", "title"])
@@ -150,7 +154,9 @@ async def test_edit_invalid_field(mock_message):
 
 @pytest.mark.asyncio
 async def test_edit_event_not_found(mock_message):
-    parsed = ParsedCommand(name="Simon", command="edit", args=["999", "title", "New Title"])
+    parsed = ParsedCommand(
+        name="Simon", command="edit", args=["999", "title", "New Title"]
+    )
     with patch("commands.edit_event", return_value=None):
         result = await handle(parsed, mock_message)
     assert "Event Not Found" in result
@@ -159,7 +165,9 @@ async def test_edit_event_not_found(mock_message):
 
 @pytest.mark.asyncio
 async def test_edit_success(mock_message):
-    parsed = ParsedCommand(name="Simon", command="edit", args=["001", "title", "New Title"])
+    parsed = ParsedCommand(
+        name="Simon", command="edit", args=["001", "title", "New Title"]
+    )
     with patch("commands.edit_event", return_value=MagicMock()):
         result = await handle(parsed, mock_message)
     assert "Event Updated" in result
@@ -170,7 +178,9 @@ async def test_edit_success(mock_message):
 @pytest.mark.asyncio
 async def test_edit_value_with_hyphens(mock_message):
     # new_value should join args[2:] with "-"
-    parsed = ParsedCommand(name="Simon", command="edit", args=["001", "description", "Part1", "Part2"])
+    parsed = ParsedCommand(
+        name="Simon", command="edit", args=["001", "description", "Part1", "Part2"]
+    )
     with patch("commands.edit_event", return_value=MagicMock()) as mock_edit:
         await handle(parsed, mock_message)
     mock_edit.assert_called_once_with("001", description="Part1-Part2")

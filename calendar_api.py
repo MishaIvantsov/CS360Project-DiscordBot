@@ -1,20 +1,19 @@
 from __future__ import annotations
 from dataclasses import dataclass
- 
- 
+
+
 @dataclass
 class Event:
-                     # FORMATTING
+    # FORMATTING
     id: str
     title: str
-    date: str        # MM.DD.YYYY
-    time: str        # HH:MM AM/PM
+    date: str  # MM.DD.YYYY
+    time: str  # HH:MM AM/PM
     location: str
     description: str
- 
- 
 
-#DATA 
+
+# DATA
 EVENTS: list[Event] = [
     Event(
         id="001",
@@ -57,25 +56,25 @@ EVENTS: list[Event] = [
         description="Don't forget the card.",
     ),
 ]
- 
- 
+
+
 # FAKE API Functions
 def get_events_by_date(date: str) -> list[Event]:
     """Return all events matching the given date (MM.DD.YYYY)."""
     return [e for e in EVENTS if e.date == date]
- 
- 
+
+
 def get_event_by_id(event_id: str) -> Event | None:
     """Return a single event by its ID, or None if not found."""
     return next((e for e in EVENTS if e.id == event_id), None)
- 
- 
+
+
 def add_event(event: Event) -> Event:
     """Add a new event to the calendar."""
     EVENTS.append(event)
     return event
- 
- 
+
+
 def edit_event(event_id: str, **kwargs) -> Event | None:
     """Update fields on an existing event by ID. Returns the updated event or None."""
     event = get_event_by_id(event_id)
@@ -85,8 +84,8 @@ def edit_event(event_id: str, **kwargs) -> Event | None:
         if hasattr(event, key):
             setattr(event, key, value)
     return event
- 
- 
+
+
 def delete_event(event_id: str) -> bool:
     """Delete an event by ID. Returns True if deleted, False if not found."""
     event = get_event_by_id(event_id)

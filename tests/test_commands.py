@@ -84,7 +84,10 @@ async def test_add_success(mock_message):
     args = ["Team Lunch", "05.01.2026", "12:00 PM", "Chipotle", "Team lunch!"]
     parsed = ParsedCommand(name="Simon", command="add", args=args)
 
-    with patch("commands.add_event") as mock_add, patch("commands.EVENTS", []):
+    mock_created = MagicMock()
+    mock_created.id = "abc123"
+
+    with patch("commands.add_event", return_value=mock_created) as mock_add:
         result = await handle(parsed, mock_message)
 
     assert "Event Added" in result
@@ -98,7 +101,10 @@ async def test_add_description_with_hyphens(mock_message):
     args = ["Team Lunch", "05.01.2026", "12:00 PM", "Chipotle", "Bring", "your", "own"]
     parsed = ParsedCommand(name="Simon", command="add", args=args)
 
-    with patch("commands.add_event") as mock_add, patch("commands.EVENTS", []):
+    mock_created = MagicMock()
+    mock_created.id = "abc123"
+
+    with patch("commands.add_event", return_value=mock_created) as mock_add:
         result = await handle(parsed, mock_message)
 
     assert "Event Added" in result

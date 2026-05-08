@@ -4,8 +4,6 @@ import discord
 from dotenv import load_dotenv
 import command_parser
 
-# LAUNCH THIS FOR DEMO 0.5
-
 load_dotenv()
 
 intents = discord.Intents.default()
@@ -32,4 +30,4 @@ async def on_message(message: discord.Message):
     await message.reply(response)
 
 
-client.run(os.getenv("DISCORD_TOKEN"))
+client.run(os.getenv("DISCORD_TOKEN", ""))

@@ -178,7 +178,11 @@ def test_add_event_returns_created_event():
 
 def test_add_event_calls_insert():
     mock_service = MagicMock()
-    mock_service.events().insert().execute.return_value = SAMPLE_G_EVENT
+
+    # Use .return_value instead of () to avoid registering calls
+    mock_service.events.return_value.insert.return_value.execute.return_value = (
+        SAMPLE_G_EVENT
+    )
 
     with patch("calendar_api.service", mock_service):
         add_event(SAMPLE_EVENT)

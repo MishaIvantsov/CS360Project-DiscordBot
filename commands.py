@@ -97,7 +97,7 @@ async def add(args: list[str], message: discord.Message) -> str:
     description = "-".join(args[4:])
 
     new_event = Event(
-        id="",  # Google assigns the real ID
+        id="",
         title=title,
         date=date,
         time=time,
@@ -105,7 +105,7 @@ async def add(args: list[str], message: discord.Message) -> str:
         description=description,
     )
 
-    created = add_event(new_event)  # returns the event with its real ID
+    created = add_event(new_event)
 
     return (
         f"✅ **Event Added!**\n"

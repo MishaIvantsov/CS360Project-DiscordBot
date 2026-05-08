@@ -1,21 +1,11 @@
 from __future__ import annotations
 import discord
-from calendar_api import (
-    get_events_by_date,
-    add_event,
-    delete_event,
-    edit_event,
-    Event,
-    EVENTS,
-)
+from calendar_api import get_events_by_date, add_event, delete_event, edit_event, Event
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from command_parser import ParsedCommand
-
-
-# FINAL VERSION 0.5
 
 
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
@@ -93,7 +83,6 @@ async def info(args: list[str], message: discord.Message) -> str:
 
 
 async def add(args: list[str], message: discord.Message) -> str:
-    # Expected format: @Simon/add-<title>-<date>-<time>-<location>-<description>
     if len(args) < 5:
         return (
             "⚠️ **Invalid format.** Please use:\n"
@@ -105,12 +94,10 @@ async def add(args: list[str], message: discord.Message) -> str:
     date = args[1]
     time = args[2]
     location = args[3]
-    description = "-".join(args[4:])  # allow hyphens in description
-
-    new_id = str(len(EVENTS) + 1).zfill(3)
+    description = "-".join(args[4:])
 
     new_event = Event(
-        id=new_id,
+        id="",  # Google assigns the real ID
         title=title,
         date=date,
         time=time,
@@ -118,11 +105,11 @@ async def add(args: list[str], message: discord.Message) -> str:
         description=description,
     )
 
-    add_event(new_event)
+    created = add_event(new_event)  # returns the event with its real ID
 
     return (
         f"✅ **Event Added!**\n"
-        f"**[{new_id}] {title}**\n"
+        f"**[{created.id}] {title}**\n"
         f"🕐 {time}  |  📍 {location}\n"
         f"📅 {date}\n"
         f"_{description}_"

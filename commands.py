@@ -1,30 +1,29 @@
 from __future__ import annotations
 import discord
-from calendar_api import get_events_by_date, add_event, delete_event, edit_event, Event, EVENTS
+from calendar_api import get_events_by_date, add_event, delete_event, edit_event, Event
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from command_parser import ParsedCommand
 
 
-#FINAL VERSION 0.5
-
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
     handlers = {
-        "edit":   edit,
-        "add":    add,
+        "edit": edit,
+        "add": add,
         "delete": delete,
-        "info" : info,
-        "help" : help_cmd,
+        "info": info,
+        "help": help_cmd,
     }
- 
+
     handler = handlers.get(parsed.command)
     if handler is None:
         return f"Unknown command `{parsed.command}`. Try `@Simon/help`."
- 
+
     return await handler(parsed.args, message)
- 
- 
+
+
 async def edit(args: list[str], message: discord.Message) -> str:
     if len(args) < 3:
         return "⚠️ **Invalid format.** Please use: `@Simon/edit-<event_id>-<field>-<new_value>`"
@@ -46,23 +45,21 @@ async def edit(args: list[str], message: discord.Message) -> str:
         f"✅ **Event Updated!**\n"
         f"Successfully changed `{field_to_edit}` to `{new_value}` for Event ID **{event_id}**."
     )
- 
- 
+
+
 async def delete(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
         return "⚠️ **Missing Event.** Please use: `@Simon/delete-<event_id>`"
-    
+
     event_id = args[0]
     success = delete_event(event_id)
 
     if not success:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
 
-    return (
-        f"✅ **Event Deleted!**\n"
-        f"Successfully deleted Event ID **{event_id}**."
-    )    
- 
+    return f"✅ **Event Deleted!**\n" f"Successfully deleted Event ID **{event_id}**."
+
+
 async def info(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
         return "⚠️ **Missing date.** Please use: `@Simon/info-<MM.DD.YYYY>`"
@@ -86,7 +83,6 @@ async def info(args: list[str], message: discord.Message) -> str:
 
 
 async def add(args: list[str], message: discord.Message) -> str:
-    # Expected format: @Simon/add-<title>-<date>-<time>-<location>-<description>
     if len(args) < 5:
         return (
             "⚠️ **Invalid format.** Please use:\n"
@@ -94,16 +90,14 @@ async def add(args: list[str], message: discord.Message) -> str:
             "Example: `@Simon/add-Team Lunch-05.01.2026-12:00 PM-Chipotle-Team lunch!`"
         )
 
-    title       = args[0]
-    date        = args[1]
-    time        = args[2]
-    location    = args[3]
-    description = "-".join(args[4:])  # allow hyphens in description
-
-    new_id = str(len(EVENTS) + 1).zfill(3)
+    title = args[0]
+    date = args[1]
+    time = args[2]
+    location = args[3]
+    description = "-".join(args[4:])
 
     new_event = Event(
-        id=new_id,
+        id="",
         title=title,
         date=date,
         time=time,
@@ -111,15 +105,16 @@ async def add(args: list[str], message: discord.Message) -> str:
         description=description,
     )
 
-    add_event(new_event)
+    created = add_event(new_event)
 
     return (
         f"✅ **Event Added!**\n"
-        f"**[{new_id}] {title}**\n"
+        f"**[{created.id}] {title}**\n"
         f"🕐 {time}  |  📍 {location}\n"
         f"📅 {date}\n"
         f"_{description}_"
     )
+
 
 async def help_cmd(args: list[str], message: discord.Message) -> str:
     return (

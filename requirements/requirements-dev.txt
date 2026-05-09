@@ -1,0 +1,9 @@
+# Static analysis
+black
+flake8
+bandit
+pre-commit
+
+# Testing
+pytest
+pytest-asyncio

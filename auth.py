@@ -6,7 +6,7 @@ from google.auth.transport.requests import Request
 from database import get_token, save_token
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-REDIRECT_URI = "http://localhost:8080"
+REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8080")
 CLIENT_SECRETS_PATH = os.getenv("GOOGLE_CLIENT_SECRETS_PATH", "client_secrets.json")
 
 # Store code verifiers in memory between auth URL generation and token exchange

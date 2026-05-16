@@ -10,14 +10,11 @@ def fake_credentials():
     ...
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def tmp_db(tmp_path, monkeypatch):
-    """Isolated database for each test. Reset between tests; never touches the real DB."""
+    """Redirect the database module to a per-test temp file. Auto-applied to every test."""
     db_path = tmp_path / "test.db"
-
-    # Point the database module at this temp file. Exact line depends on
-    # how database.py resolves its path — see notes below.
-    # monkeypatch.setattr("database.DB_PATH", str(db_path))
+    monkeypatch.setattr("database.DB_PATH", str(db_path))
 
     from database import init_db
 

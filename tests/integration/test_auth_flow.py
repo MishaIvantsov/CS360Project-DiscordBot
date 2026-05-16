@@ -41,6 +41,7 @@ def test_exchange_code_persists_token(fake_credentials, tmp_db):
 
     # And the token landed in the DB
     stored = auth.get_token(discord_id)
+    assert stored is not None
     assert stored["token"] == "fake-access"
     assert stored["refresh_token"] == "fake-refresh"
     assert stored["scopes"] == ["https://www.googleapis.com/auth/calendar"]

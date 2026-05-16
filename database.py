@@ -16,16 +16,14 @@ def _get_connection() -> sqlite3.Connection:
 def init_db() -> None:
     """Create the tokens table if it doesn't exist."""
     with _get_connection() as conn:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS user_tokens (
                 discord_id TEXT PRIMARY KEY,
                 token       TEXT NOT NULL,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
+            """)
         conn.commit()
 
 

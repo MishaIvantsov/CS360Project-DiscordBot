@@ -13,3 +13,7 @@ asyncio_mode = "auto"
 filterwarnings = [
     "ignore::DeprecationWarning:discord.client",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv"]
+skips = ["B101", "B105"]

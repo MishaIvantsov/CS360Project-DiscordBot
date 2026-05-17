@@ -1,22 +1,14 @@
 from __future__ import annotations
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
-from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 load_dotenv()
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
-CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH")
-CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID")
-
-creds = service_account.Credentials.from_service_account_file(
-    CREDENTIALS_PATH, scopes=SCOPES
-)
-service = build("calendar", "v3", credentials=creds)
+CALENDAR_ID = "primary"
 
 
 @dataclass
@@ -27,6 +19,14 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
+
+
+# --- Service Builder ---
+
+
+def get_calendar_service(creds: OAuth2Credentials):
+    """Build and return a Google Calendar service for a given user's credentials."""
+    return build("calendar", "v3", credentials=creds)
 
 
 # --- Helpers ---
@@ -42,7 +42,6 @@ def _to_event(g_event: dict) -> Event:
         date = dt.strftime("%m.%d.%Y")
         time = dt.strftime("%I:%M %p").lstrip("0")
     else:
-        # All-day event
         dt = datetime.strptime(dt_str, "%Y-%m-%d")
         date = dt.strftime("%m.%d.%Y")
         time = "All Day"
@@ -60,7 +59,7 @@ def _to_event(g_event: dict) -> Event:
 def _to_google_event(event: Event) -> dict:
     """Convert our Event dataclass to a Google Calendar API event dict."""
     dt = datetime.strptime(f"{event.date} {event.time}", "%m.%d.%Y %I:%M %p")
-    dt_end = dt + timedelta(hours=1)  # default 1-hour duration
+    dt_end = dt + timedelta(hours=1)
 
     return {
         "summary": event.title,
@@ -74,8 +73,9 @@ def _to_google_event(event: Event) -> dict:
 # --- API Functions ---
 
 
-def get_events_by_date(date: str) -> list[Event]:
+def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
     """Return all events on a given date (MM.DD.YYYY)."""
+    service = get_calendar_service(creds)
     dt = datetime.strptime(date, "%m.%d.%Y").replace(tzinfo=timezone.utc)
     time_min = dt.isoformat()
     time_max = (dt + timedelta(days=1)).isoformat()
@@ -95,8 +95,9 @@ def get_events_by_date(date: str) -> list[Event]:
     return [_to_event(e) for e in result.get("items", [])]
 
 
-def get_event_by_id(event_id: str) -> Event | None:
+def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
     """Return a single event by its Google Calendar ID, or None if not found."""
+    service = get_calendar_service(creds)
     try:
         g_event = (
             service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
@@ -106,15 +107,17 @@ def get_event_by_id(event_id: str) -> Event | None:
         return None
 
 
-def add_event(event: Event) -> Event:
+def add_event(creds: OAuth2Credentials, event: Event) -> Event:
     """Add a new event to the calendar. Returns the created event with its real ID."""
+    service = get_calendar_service(creds)
     g_event = _to_google_event(event)
     created = service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
     return _to_event(created)
 
 
-def edit_event(event_id: str, **kwargs) -> Event | None:
+def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
     """Update fields on an existing event. Returns the updated event or None."""
+    service = get_calendar_service(creds)
     try:
         g_event = (
             service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
@@ -145,8 +148,9 @@ def edit_event(event_id: str, **kwargs) -> Event | None:
     return _to_event(updated)
 
 
-def delete_event(event_id: str) -> bool:
+def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
     """Delete an event by ID. Returns True if deleted, False if not found."""
+    service = get_calendar_service(creds)
     try:
         service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
         return True

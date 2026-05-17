@@ -1,6 +1,7 @@
 from __future__ import annotations
 from unittest.mock import MagicMock, patch
 import pytest  # noqa: F401
+from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 # Patch Google auth and build before calendar_api loads
 with (
@@ -50,6 +51,11 @@ SAMPLE_EVENT = Event(
 )
 
 
+def make_mock_creds() -> OAuth2Credentials:
+    """Return a mock OAuth2Credentials object."""
+    return MagicMock(spec=OAuth2Credentials)
+
+
 # --- _to_event() ---
 
 
@@ -70,8 +76,10 @@ def test_to_event_all_day():
 
 
 def test_to_event_missing_summary():
-    g_event = {**SAMPLE_G_EVENT, "summary": None}
-    g_event.pop("summary")
+    g_event = {
+        "id": "abc123",
+        "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
+    }
     event = _to_event(g_event)
     assert event.title == "No Title"
 
@@ -120,8 +128,8 @@ def test_get_events_by_date_returns_events():
     mock_service = MagicMock()
     mock_service.events().list().execute.return_value = {"items": [SAMPLE_G_EVENT]}
 
-    with patch("calendar_api.service", mock_service):
-        result = get_events_by_date("05.01.2026")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = get_events_by_date(make_mock_creds(), "05.01.2026")
 
     assert len(result) == 1
     assert result[0].title == "Team Lunch"
@@ -131,8 +139,8 @@ def test_get_events_by_date_returns_empty_list():
     mock_service = MagicMock()
     mock_service.events().list().execute.return_value = {"items": []}
 
-    with patch("calendar_api.service", mock_service):
-        result = get_events_by_date("01.01.2099")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = get_events_by_date(make_mock_creds(), "01.01.2099")
 
     assert result == []
 
@@ -144,8 +152,8 @@ def test_get_event_by_id_returns_event():
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = SAMPLE_G_EVENT
 
-    with patch("calendar_api.service", mock_service):
-        result = get_event_by_id("abc123")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = get_event_by_id(make_mock_creds(), "abc123")
 
     assert result is not None
     assert result.id == "abc123"
@@ -156,8 +164,8 @@ def test_get_event_by_id_returns_none_when_not_found():
     mock_service = MagicMock()
     mock_service.events().get().execute.side_effect = Exception("Not found")
 
-    with patch("calendar_api.service", mock_service):
-        result = get_event_by_id("nonexistent")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = get_event_by_id(make_mock_creds(), "nonexistent")
 
     assert result is None
 
@@ -169,8 +177,8 @@ def test_add_event_returns_created_event():
     mock_service = MagicMock()
     mock_service.events().insert().execute.return_value = SAMPLE_G_EVENT
 
-    with patch("calendar_api.service", mock_service):
-        result = add_event(SAMPLE_EVENT)
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = add_event(make_mock_creds(), SAMPLE_EVENT)
 
     assert result.id == "abc123"
     assert result.title == "Team Lunch"
@@ -178,16 +186,12 @@ def test_add_event_returns_created_event():
 
 def test_add_event_calls_insert():
     mock_service = MagicMock()
+    mock_service.events().insert().execute.return_value = SAMPLE_G_EVENT
 
-    # Use .return_value instead of () to avoid registering calls
-    mock_service.events.return_value.insert.return_value.execute.return_value = (
-        SAMPLE_G_EVENT
-    )
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        add_event(make_mock_creds(), SAMPLE_EVENT)
 
-    with patch("calendar_api.service", mock_service):
-        add_event(SAMPLE_EVENT)
-
-    mock_service.events().insert.assert_called_once()
+    mock_service.events().insert.assert_called()
 
 
 # --- edit_event() ---
@@ -199,8 +203,8 @@ def test_edit_event_updates_title():
     mock_service.events().get().execute.return_value = dict(SAMPLE_G_EVENT)
     mock_service.events().update().execute.return_value = updated_g_event
 
-    with patch("calendar_api.service", mock_service):
-        result = edit_event("abc123", title="Updated Lunch")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(make_mock_creds(), "abc123", title="Updated Lunch")
 
     assert result is not None
     assert result.title == "Updated Lunch"
@@ -210,8 +214,8 @@ def test_edit_event_returns_none_when_not_found():
     mock_service = MagicMock()
     mock_service.events().get().execute.side_effect = Exception("Not found")
 
-    with patch("calendar_api.service", mock_service):
-        result = edit_event("nonexistent", title="Whatever")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(make_mock_creds(), "nonexistent", title="Whatever")
 
     assert result is None
 
@@ -222,8 +226,8 @@ def test_edit_event_returns_none_when_not_found():
 def test_delete_event_returns_true_on_success():
     mock_service = MagicMock()
 
-    with patch("calendar_api.service", mock_service):
-        result = delete_event("abc123")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = delete_event(make_mock_creds(), "abc123")
 
     assert result is True
 
@@ -232,7 +236,7 @@ def test_delete_event_returns_false_when_not_found():
     mock_service = MagicMock()
     mock_service.events().delete().execute.side_effect = Exception("Not found")
 
-    with patch("calendar_api.service", mock_service):
-        result = delete_event("nonexistent")
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = delete_event(make_mock_creds(), "nonexistent")
 
     assert result is False

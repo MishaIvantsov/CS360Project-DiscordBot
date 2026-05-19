@@ -1,0 +1,191 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from dotenv import load_dotenv
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials as OAuth2Credentials
+
+load_dotenv()
+
+CALENDAR_ID = "primary"
+
+
+@dataclass
+class Event:
+    id: str
+    title: str
+    day: int
+    month: int
+    year: int
+    time: str
+    location: str
+    description: str
+
+
+# --- Service Builder ---
+
+
+def get_calendar_service(creds: OAuth2Credentials):
+    """Build and return a Google Calendar service for a given user's credentials."""
+    return build("calendar", "v3", credentials=creds)
+
+
+# --- Helpers ---
+
+
+def _to_event(g_event: dict) -> Event:
+    """Convert a Google Calendar API response dict to our Event dataclass."""
+    start = g_event.get("start", {})
+    dt_str = start.get("dateTime") or start.get("date", "")
+
+    if "T" in dt_str:
+        dt = datetime.fromisoformat(dt_str)
+
+        day = dt.day
+        month = dt.month
+        year = dt.year
+
+        time = dt.strftime("%I:%M %p").lstrip("0")
+
+    else:
+        dt = datetime.strptime(dt_str, "%Y-%m-%d")
+
+        day = dt.day
+        month = dt.month
+        year = dt.year
+
+        time = "All Day"
+
+    return Event(
+        id=g_event.get("id", ""),
+        title=g_event.get("summary", "No Title"),
+        day=day,
+        month=month,
+        year=year,
+        time=time,
+        location=g_event.get("location", ""),
+        description=g_event.get("description", ""),
+    )
+
+
+def _to_google_event(event: Event) -> dict:
+    """Convert our Event dataclass to a Google Calendar API event dict."""
+    dt = datetime.strptime(
+        f"{event.month:02}.{event.day:02}.{event.year} {event.time}",
+        "%m.%d.%Y %I:%M %p"
+    )
+
+    dt_end = dt + timedelta(hours=1)
+
+    return {
+        "summary": event.title,
+        "location": event.location,
+        "description": event.description,
+        "start": {
+            "dateTime": dt.isoformat(),
+            "timeZone": "UTC"
+        },
+        "end": {
+            "dateTime": dt_end.isoformat(),
+            "timeZone": "UTC"
+        },
+    }
+
+
+# --- API Functions ---
+
+
+def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
+    """Return all events on a given date (MM.DD.YYYY)."""
+    service = get_calendar_service(creds)
+    dt = datetime.strptime(date, "%m.%d.%Y").replace(tzinfo=timezone.utc)
+    time_min = dt.isoformat()
+    time_max = (dt + timedelta(days=1)).isoformat()
+
+    result = (
+        service.events()
+        .list(
+            calendarId=CALENDAR_ID,
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
+
+    return [_to_event(e) for e in result.get("items", [])]
+
+
+def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
+    """Return a single event by its Google Calendar ID, or None if not found."""
+    service = get_calendar_service(creds)
+    try:
+        g_event = (
+            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        )
+        return _to_event(g_event)
+    except Exception:
+        return None
+
+
+def add_event(creds: OAuth2Credentials, event: Event) -> Event:
+    """Add a new event to the calendar. Returns the created event with its real ID."""
+    service = get_calendar_service(creds)
+    g_event = _to_google_event(event)
+    created = service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
+    return _to_event(created)
+
+
+def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
+    """Update fields on an existing event. Returns the updated event or None."""
+    service = get_calendar_service(creds)
+    try:
+        g_event = (
+            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        )
+    except Exception:
+        return None
+
+    if "title" in kwargs:
+        g_event["summary"] = kwargs["title"]
+    if "location" in kwargs:
+        g_event["location"] = kwargs["location"]
+    if "description" in kwargs:
+        g_event["description"] = kwargs["description"]
+    if (
+        "day" in kwargs
+        or "month" in kwargs
+        or "year" in kwargs
+        or "time" in kwargs
+    ):
+        current = _to_event(g_event)
+        new_day = kwargs.get("day", current.day)
+        new_month = kwargs.get("month", current.month)
+        new_year = kwargs.get("year", current.year)
+        new_time = kwargs.get("time", current.time)
+        dt = datetime.strptime(
+            f"{new_month:02}.{new_day:02}.{new_year} {new_time}",
+            "%m.%d.%Y %I:%M %p"
+        )
+        dt_end = dt + timedelta(hours=1)
+        g_event["start"] = {"dateTime": dt.isoformat(), "timeZone": "UTC"}
+        g_event["end"] = {"dateTime": dt_end.isoformat(), "timeZone": "UTC"}
+
+    updated = (
+        service.events()
+        .update(calendarId=CALENDAR_ID, eventId=event_id, body=g_event)
+        .execute()
+    )
+    return _to_event(updated)
+
+
+def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
+    """Delete an event by ID. Returns True if deleted, False if not found."""
+    service = get_calendar_service(creds)
+    try:
+        service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        return True
+    except Exception:
+        return False

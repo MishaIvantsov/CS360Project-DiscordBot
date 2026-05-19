@@ -19,6 +19,7 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
+    attendees: list[str] = None  # NEW: Added for Scrum 20
 
 
 # --- Service Builder ---
@@ -46,6 +47,10 @@ def _to_event(g_event: dict) -> Event:
         date = dt.strftime("%m.%d.%Y")
         time = "All Day"
 
+    # Extract attendees from Google's format
+    raw_attendees = g_event.get("attendees", [])
+    attendee_names = [a.get("displayName", a.get("email", "")) for a in raw_attendees]
+
     return Event(
         id=g_event.get("id", ""),
         title=g_event.get("summary", "No Title"),
@@ -53,13 +58,21 @@ def _to_event(g_event: dict) -> Event:
         time=time,
         location=g_event.get("location", ""),
         description=g_event.get("description", ""),
+        attendees=attendee_names,  # NEW
     )
 
 
 def _to_google_event(event: Event) -> dict:
-    """Convert our Event dataclass to a Google Calendar API event dict."""
+    """Convert our Event dataclass to a Google Calendar API request dict."""
     dt = datetime.strptime(f"{event.date} {event.time}", "%m.%d.%Y %I:%M %p")
     dt_end = dt + timedelta(hours=1)
+
+    # Format attendees for Google API
+    g_attendees = []
+    if event.attendees:
+        for name in event.attendees:
+            safe_email = f"{name.replace('@', '').replace('<', '').replace('>', '')}@discord.local"
+            g_attendees.append({"email": safe_email, "displayName": name})
 
     return {
         "summary": event.title,
@@ -67,52 +80,52 @@ def _to_google_event(event: Event) -> dict:
         "description": event.description,
         "start": {"dateTime": dt.isoformat(), "timeZone": "UTC"},
         "end": {"dateTime": dt_end.isoformat(), "timeZone": "UTC"},
+        "attendees": g_attendees,  # NEW
     }
 
 
 # --- API Functions ---
 
 
-def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
-    """Return all events on a given date (MM.DD.YYYY)."""
+def get_events_by_date(creds: OAuth2Credentials, date_str: str) -> list[Event]:
+    """Return all events for a given date (MM.DD.YYYY) from the user's calendar."""
     service = get_calendar_service(creds)
-    dt = datetime.strptime(date, "%m.%d.%Y").replace(tzinfo=timezone.utc)
-    time_min = dt.isoformat()
-    time_max = (dt + timedelta(days=1)).isoformat()
+    dt = datetime.strptime(date_str, "%m.%d.%Y")
 
-    result = (
-        service.events()
-        .list(
-            calendarId=CALENDAR_ID,
-            timeMin=time_min,
-            timeMax=time_max,
-            singleEvents=True,
-            orderBy="startTime",
-        )
-        .execute()
-    )
+    time_min = dt.replace(hour=0, minute=0, second=0).isoformat() + "Z"
+    time_max = dt.replace(hour=23, minute=59, second=59).isoformat() + "Z"
 
-    return [_to_event(e) for e in result.get("items", [])]
-
-
-def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
-    """Return a single event by its Google Calendar ID, or None if not found."""
-    service = get_calendar_service(creds)
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        events_result = (
+            service.events()
+            .list(
+                calendarId=CALENDAR_ID,
+                timeMin=time_min,
+                timeMax=time_max,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
         )
-        return _to_event(g_event)
+    except Exception:
+        return []
+
+    g_events = events_result.get("items", [])
+    return [_to_event(e) for e in g_events]
+
+
+def add_event(creds: OAuth2Credentials, event: Event) -> Event | None:
+    """Add a new event to the user's Google Calendar. Returns the created event."""
+    service = get_calendar_service(creds)
+    body = _to_google_event(event)
+
+    try:
+        created = (
+            service.events().insert(calendarId=CALENDAR_ID, body=body).execute()
+        )
+        return _to_event(created)
     except Exception:
         return None
-
-
-def add_event(creds: OAuth2Credentials, event: Event) -> Event:
-    """Add a new event to the calendar. Returns the created event with its real ID."""
-    service = get_calendar_service(creds)
-    g_event = _to_google_event(event)
-    created = service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
-    return _to_event(created)
 
 
 def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
@@ -124,6 +137,26 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
         )
     except Exception:
         return None
+
+    # Handle Scrum 20 Attending People operations
+    if "add_attendee" in kwargs or "remove_attendee" in kwargs:
+        current_attendees = g_event.get("attendees", [])
+        current_names = [a.get("displayName", "") for a in current_attendees]
+        
+        if "add_attendee" in kwargs:
+            person = kwargs["add_attendee"]
+            if person in current_names:
+                return "duplicate"
+            safe_email = f"{person.replace('@', '').replace('<', '').replace('>', '')}@discord.local"
+            current_attendees.append({"email": safe_email, "displayName": person})
+            
+        elif "remove_attendee" in kwargs:
+            person = kwargs["remove_attendee"]
+            if person not in current_names:
+                return "not_found"
+            current_attendees = [a for a in current_attendees if a.get("displayName") != person]
+
+        g_event["attendees"] = current_attendees
 
     if "title" in kwargs:
         g_event["summary"] = kwargs["title"]
@@ -149,7 +182,7 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
 
 
 def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
-    """Delete an event by ID. Returns True if deleted, False if not found."""
+    """Delete an event by ID. Returns True if successful, False otherwise."""
     service = get_calendar_service(creds)
     try:
         service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()

@@ -265,25 +265,6 @@ def test_add_attendee_success():
     assert "test_user@uw.edu" in result.attendees
 
 
-def test_add_attendee_success():
-    mock_service = MagicMock()
-    mock_service.events().get().execute.return_value = {
-        "summary": "Scrum Meeting",
-        "start": {"date": "2026-05-19"},
-        "attendees": [],
-    }
-    mock_service.events().update().execute.return_value = {
-        "summary": "Scrum Meeting",
-        "start": {"date": "2026-05-19"},
-        "attendees": [{"displayName": "test_user@uw.edu"}],
-    }
-
-    with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(
-            make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
-        )
-
-
 def test_add_attendee_duplicate():
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = {
@@ -300,7 +281,7 @@ def test_add_attendee_duplicate():
 
 
 def test_remove_attendee_success():
-    mock_service = MagicMock()
+    mock_service = MagicMock()  # <--- MAKE SURE THIS LINE EXISTS HERE
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"date": "2026-05-19"},
@@ -316,10 +297,11 @@ def test_remove_attendee_success():
         result = edit_event(
             make_mock_creds(), "abc123", remove_attendee="test_user@uw.edu"
         )
+    assert result.attendees == []  # <--- Read the variable so flake8 is happy
 
 
 def test_remove_attendee_not_found():
-    mock_service = MagicMock()
+    mock_service = MagicMock()  # <--- MAKE SURE THIS LINE EXISTS HERE TOO
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"dateTime": "2026-05-01T12:00:00+00:00"},

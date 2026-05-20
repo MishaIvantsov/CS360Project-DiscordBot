@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -71,7 +71,8 @@ def _to_google_event(event: Event) -> dict:
     g_attendees = []
     if event.attendees:
         for name in event.attendees:
-            safe_email = f"{name.replace('@', '').replace('<', '').replace('>', '')}@discord.local"
+            clean_name = name.replace("@", "").replace("<", "").replace(">", "")
+            safe_email = f"{clean_name}@discord.local"
             g_attendees.append({"email": safe_email, "displayName": name})
 
     return {
@@ -136,7 +137,7 @@ def add_event(creds: OAuth2Credentials, event: Event) -> Event | None:
         return None
 
 
-def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
+def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | str | None:
     """Update fields on an existing event. Returns the updated event or None."""
     service = get_calendar_service(creds)
     try:
@@ -155,7 +156,8 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
             person = kwargs["add_attendee"]
             if person in current_names:
                 return "duplicate"
-            safe_email = f"{person.replace('@', '').replace('<', '').replace('>', '')}@discord.local"
+            clean_name = person.replace("@", "").replace("<", "").replace(">", "")
+            safe_email = f"{clean_name}@discord.local"
             current_attendees.append({"email": safe_email, "displayName": person})
 
         elif "remove_attendee" in kwargs:

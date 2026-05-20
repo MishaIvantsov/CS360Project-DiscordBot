@@ -1,13 +1,6 @@
 from __future__ import annotations
 from database import delete_token
 import discord
-from calendar_api import (
-    get_events_by_date,
-    add_event,
-    delete_event,
-    edit_event,
-    Event,
-)
 from auth import get_auth_url, get_credentials
 from google.oauth2.credentials import Credentials as OAuth2Credentials
 
@@ -73,6 +66,9 @@ async def info(args: list[str], message: discord.Message) -> str:
         return error
     assert creds is not None
 
+    # LOCAL IMPORT HERE
+    from calendar_api import get_events_by_date
+
     date_str = args[0]
     events = get_events_by_date(creds, date_str)
 
@@ -99,6 +95,9 @@ async def add(args: list[str], message: discord.Message) -> str:
         return error
     assert creds is not None
 
+    # LOCAL IMPORTS HERE
+    from calendar_api import add_event, Event
+
     new_event = Event(
         id="",
         title=args[0],
@@ -124,6 +123,9 @@ async def edit(args: list[str], message: discord.Message) -> str:
     if error:
         return error
     assert creds is not None
+
+    # LOCAL IMPORT HERE
+    from calendar_api import edit_event
 
     event_id = args[0]
     field_to_edit = args[1].lower()
@@ -183,6 +185,9 @@ async def delete(args: list[str], message: discord.Message) -> str:
     if error:
         return error
     assert creds is not None
+
+    # LOCAL IMPORT HERE
+    from calendar_api import delete_event
 
     event_id = args[0]
     success = delete_event(creds, event_id)

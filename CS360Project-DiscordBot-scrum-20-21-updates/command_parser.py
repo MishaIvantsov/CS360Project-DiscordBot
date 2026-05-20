@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 import discord
-import commands
 
 
 @dataclass
@@ -33,4 +32,7 @@ async def parse(text: str, message: discord.Message) -> str:
         args.pop()
 
     parsed = ParsedCommand(name=name, command=command, args=args)
+
+    import commands
+
     return await commands.handle(parsed, message)

@@ -1,0 +1,68 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install lint tools
+        run: pip install black flake8 bandit
+      - name: Black (formatter)
+        run: python -m black --check .
+      - name: Flake8 (linter)
+        run: python -m flake8 .
+      - name: Bandit (security)
+        run: python -m bandit -r . -c pyproject.toml
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m pytest tests/unit -v
+      - name: Integration tests
+        run: python -m pytest tests/integration -v
+      - name: Smoke tests
+        run: python -m pytest tests/smoke -v
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Wait for app to come up
+        run: sleep 20
+      - name: Health check
+        run: |
+          curl -f --retry 6 --retry-delay 5 --retry-all-errors \
+            https://simon-bot.fly.dev/health

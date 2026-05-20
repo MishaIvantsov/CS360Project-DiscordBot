@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements/requirements.txt
       - name: Unit tests
         run: python -m pytest tests/unit -v
       - name: Integration tests

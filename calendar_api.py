@@ -73,7 +73,7 @@ def _to_google_event(event: Event) -> dict:
     """Convert our Event dataclass to a Google Calendar API event dict."""
     dt = datetime.strptime(
         f"{event.month:02}.{event.day:02}.{event.year} {event.time}",
-        "%m.%d.%Y %I:%M %p"
+        "%m.%d.%Y %I:%M %p",
     )
 
     dt_end = dt + timedelta(hours=1)
@@ -82,14 +82,8 @@ def _to_google_event(event: Event) -> dict:
         "summary": event.title,
         "location": event.location,
         "description": event.description,
-        "start": {
-            "dateTime": dt.isoformat(),
-            "timeZone": "UTC"
-        },
-        "end": {
-            "dateTime": dt_end.isoformat(),
-            "timeZone": "UTC"
-        },
+        "start": {"dateTime": dt.isoformat(), "timeZone": "UTC"},
+        "end": {"dateTime": dt_end.isoformat(), "timeZone": "UTC"},
     }
 
 
@@ -154,20 +148,14 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
         g_event["location"] = kwargs["location"]
     if "description" in kwargs:
         g_event["description"] = kwargs["description"]
-    if (
-        "day" in kwargs
-        or "month" in kwargs
-        or "year" in kwargs
-        or "time" in kwargs
-    ):
+    if "day" in kwargs or "month" in kwargs or "year" in kwargs or "time" in kwargs:
         current = _to_event(g_event)
         new_day = kwargs.get("day", current.day)
         new_month = kwargs.get("month", current.month)
         new_year = kwargs.get("year", current.year)
         new_time = kwargs.get("time", current.time)
         dt = datetime.strptime(
-            f"{new_month:02}.{new_day:02}.{new_year} {new_time}",
-            "%m.%d.%Y %I:%M %p"
+            f"{new_month:02}.{new_day:02}.{new_year} {new_time}", "%m.%d.%Y %I:%M %p"
         )
         dt_end = dt + timedelta(hours=1)
         g_event["start"] = {"dateTime": dt.isoformat(), "timeZone": "UTC"}

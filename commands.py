@@ -16,7 +16,10 @@ def get_creds_or_error(discord_id: str) -> tuple[OAuth2Credentials | None, str |
     creds = get_credentials(discord_id)
 
     if creds is None:
-        return None, "⚠️ **Not linked.** Use `/link` to connect your Google Calendar first."
+        return (
+            None,
+            "⚠️ **Not linked.** Use `/link` to connect your Google Calendar first.",
+        )
 
     return creds, None
 
@@ -78,10 +81,9 @@ async def add(
 
     if error:
         return error
-    
+
     time = time.upper().replace("AM", " AM").replace("PM", " PM")
     time = " ".join(time.split())
-
 
     new_event = Event(
         id="",
@@ -96,10 +98,10 @@ async def add(
 
     try:
         created = add_event(creds, new_event)
-        
+
     except ValueError:
         return "⚠️ Time must include AM or PM. Example: `3:31 PM`"
-    
+
     date_text = f"{month:02}/{day:02}/{year}"
 
     return (

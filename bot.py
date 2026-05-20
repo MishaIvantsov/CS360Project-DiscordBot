@@ -88,10 +88,7 @@ async def link_command(interaction: discord.Interaction):
     response = await commands.link(discord_id)
 
     await interaction.followup.send(
-        embed=make_embed(
-            "Link Google Calendar",
-            response
-        ),
+        embed=make_embed("Link Google Calendar", response),
         ephemeral=True,
     )
 
@@ -99,7 +96,7 @@ async def link_command(interaction: discord.Interaction):
 @tree.command(name="unlink", description="Unlink your Google Calendar")
 async def unlink_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    
+
     discord_id = str(interaction.user.id)
 
     response = await commands.unlink(discord_id)
@@ -119,9 +116,7 @@ async def info_command(interaction: discord.Interaction, date: str):
 
     response = await commands.info(discord_id, date)
 
-    await interaction.followup.send(
-        embed=make_embed("Calendar Info", response)
-    )
+    await interaction.followup.send(embed=make_embed("Calendar Info", response))
 
 
 @tree.command(name="add", description="Add a calendar event")
@@ -196,9 +191,7 @@ async def edit_command(
         new_value,
     )
 
-    await interaction.followup.send(
-        embed=make_embed("Edit Event", response)
-    )
+    await interaction.followup.send(embed=make_embed("Edit Event", response))
 
 
 @tree.command(name="delete", description="Delete a calendar event")

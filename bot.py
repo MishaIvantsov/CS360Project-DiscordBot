@@ -59,7 +59,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
 def start_callback_server():
     # --- FIXED: Bind to 0.0.0.0 and use Fly's injected PORT ---
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), CallbackHandler)
+    server = HTTPServer(("0.0.0.0", port), CallbackHandler)  # nosec B104
     server.serve_forever()
 
 

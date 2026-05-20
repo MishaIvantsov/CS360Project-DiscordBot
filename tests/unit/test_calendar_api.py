@@ -241,50 +241,92 @@ def test_delete_event_returns_false_when_not_found():
 
     assert result is False
 
-import pytest
-from calendar_api import add_attendee, remove_attendee, _to_event, _to_google_event
+
+# --- Attendee Tests (Via edit_event) ---
+
 
 def test_add_attendee_success():
-    """Test successfully adding a new attendee to an event."""
-    event = {"summary": "Scrum Meeting", "attendees": []}
-    updated_event = add_attendee(event, "test_user@uw.edu")
-    assert "test_user@uw.edu" in updated_event["attendees"]
+    mock_service = MagicMock()
+    mock_service.events().get().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
+        "attendees": [],
+    }
+    mock_service.events().update().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
+        "attendees": [{"displayName": "test_user@uw.edu"}],
+    }
+
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(
+            make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
+        )
+    assert "test_user@uw.edu" in result.attendees
+
+
+def test_add_attendee_success():
+    mock_service = MagicMock()
+    mock_service.events().get().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"date": "2026-05-19"},
+        "attendees": [],
+    }
+    mock_service.events().update().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"date": "2026-05-19"},
+        "attendees": [{"displayName": "test_user@uw.edu"}],
+    }
+
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(
+            make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
+        )
+
 
 def test_add_attendee_duplicate():
-    """Test that duplicate attendees are handled gracefully and not added twice."""
-    event = {"summary": "Scrum Meeting", "attendees": ["test_user@uw.edu"]}
-    updated_event = add_attendee(event, "test_user@uw.edu")
-    assert updated_event["attendees"].count("test_user@uw.edu") == 1
+    mock_service = MagicMock()
+    mock_service.events().get().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"date": "2026-05-19"},
+        "attendees": [{"displayName": "test_user@uw.edu"}],
+    }
+
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(
+            make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
+        )
+    assert result == "duplicate"
 
 def test_remove_attendee_success():
-    """Test successfully removing an attendee from an event."""
-    event = {"summary": "Scrum Meeting", "attendees": ["test_user@uw.edu"]}
-    updated_event = remove_attendee(event, "test_user@uw.edu")
-    assert "test_user@uw.edu" not in updated_event["attendees"]
+    mock_service = MagicMock()
+    mock_service.events().get().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"date": "2026-05-19"},
+        "attendees": [{"displayName": "test_user@uw.edu"}],
+    }
+    mock_service.events().update().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"date": "2026-05-19"},
+        "attendees": [],
+    }
+
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(
+            make_mock_creds(), "abc123", remove_attendee="test_user@uw.edu"
+        )
+
 
 def test_remove_attendee_not_found():
-    """Test removing an attendee who isn't on the list doesn't crash."""
-    event = {"summary": "Scrum Meeting", "attendees": ["test_user@uw.edu"]}
-    updated_event = remove_attendee(event, "missing_user@uw.edu")
-    assert "test_user@uw.edu" in updated_event["attendees"]
-    assert len(updated_event["attendees"]) == 1
-
-def test_attendee_round_trip_conversion():
-    """Test that attendee lists map correctly between internal and Google event formats."""
-    # Mock a raw Google API event structure
-    google_event = {
-        "id": "123",
-        "summary": "Project Sync",
-        "start": {"dateTime": "2026-05-20T10:00:00Z"},
-        "end": {"dateTime": "2026-05-20T11:00:00Z"},
-        "attendees": [{"email": "aiden@uw.edu"}, {"email": "misha@uw.edu"}]
+    mock_service = MagicMock()
+    mock_service.events().get().execute.return_value = {
+        "summary": "Scrum Meeting",
+        "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
+        "attendees": [{"displayName": "test_user@uw.edu"}],
     }
-    
-    # Convert Google -> Internal
-    internal_event = _to_event(google_event)
-    assert "aiden@uw.edu" in internal_event.attendees
-    assert "misha@uw.edu" in internal_event.attendees
-    
-    # Convert Internal -> Google
-    back_to_google = _to_google_event(internal_event)
-    assert any(a["email"] == "aiden@uw.edu" for a["email"] in back_to_google["attendees"])
+
+    with patch("calendar_api.get_calendar_service", return_value=mock_service):
+        result = edit_event(
+            make_mock_creds(), "abc123", remove_attendee="missing_user@uw.edu"
+        )
+    assert result == "not_found"

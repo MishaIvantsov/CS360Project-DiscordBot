@@ -19,7 +19,7 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
-    attendees: list[str] = None  # NEW: Added for Scrum 20
+attendees: list[str] | None = None  # NEW: Added for Scrum 20
 
 
 # --- Service Builder ---
@@ -112,6 +112,18 @@ def get_events_by_date(creds: OAuth2Credentials, date_str: str) -> list[Event]:
 
     g_events = events_result.get("items", [])
     return [_to_event(e) for e in g_events]
+
+
+def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
+    """Return a single event by its Google Calendar ID, or None if not found."""
+    service = get_calendar_service(creds)
+    try:
+        g_event = (
+            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        )
+        return _to_event(g_event)
+    except Exception:
+        return None
 
 
 def add_event(creds: OAuth2Credentials, event: Event) -> Event | None:

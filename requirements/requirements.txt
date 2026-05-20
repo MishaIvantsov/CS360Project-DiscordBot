@@ -2,3 +2,5 @@ discord.py
 google-auth
 google-api-python-client
 python-dotenv
+google-auth-oauthlib
+google-auth-httplib2

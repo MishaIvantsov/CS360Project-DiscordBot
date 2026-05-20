@@ -19,8 +19,7 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
-attendees: list[str] | None = None  # NEW: Added for Scrum 20
-
+    attendees: list[str] | None = None  # NEW: Added for Scrum 20
 
 # --- Service Builder ---
 
@@ -113,15 +112,12 @@ def get_events_by_date(creds: OAuth2Credentials, date_str: str) -> list[Event]:
     g_events = events_result.get("items", [])
     return [_to_event(e) for e in g_events]
 
-
 def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
-    """Return a single event by its Google Calendar ID, or None if not found."""
-    service = get_calendar_service(creds)
+    """Retrieves a specific calendar event by its ID."""
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
-        )
-        return _to_event(g_event)
+        service = get_calendar_service(creds)
+        event = service.events().get(calendarId="primary", eventId=event_id).execute()
+        return _to_event(event)
     except Exception:
         return None
 
@@ -132,9 +128,7 @@ def add_event(creds: OAuth2Credentials, event: Event) -> Event | None:
     body = _to_google_event(event)
 
     try:
-        created = (
-            service.events().insert(calendarId=CALENDAR_ID, body=body).execute()
-        )
+        created = service.events().insert(calendarId=CALENDAR_ID, body=body).execute()
         return _to_event(created)
     except Exception:
         return None
@@ -154,19 +148,21 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
     if "add_attendee" in kwargs or "remove_attendee" in kwargs:
         current_attendees = g_event.get("attendees", [])
         current_names = [a.get("displayName", "") for a in current_attendees]
-        
+
         if "add_attendee" in kwargs:
             person = kwargs["add_attendee"]
             if person in current_names:
                 return "duplicate"
             safe_email = f"{person.replace('@', '').replace('<', '').replace('>', '')}@discord.local"
             current_attendees.append({"email": safe_email, "displayName": person})
-            
+
         elif "remove_attendee" in kwargs:
             person = kwargs["remove_attendee"]
             if person not in current_names:
                 return "not_found"
-            current_attendees = [a for a in current_attendees if a.get("displayName") != person]
+            current_attendees = [
+                a for a in current_attendees if a.get("displayName") != person
+            ]
 
         g_event["attendees"] = current_attendees
 

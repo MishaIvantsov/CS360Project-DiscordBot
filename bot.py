@@ -5,9 +5,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
 import discord
+from discord import app_commands
 from dotenv import load_dotenv
 
 import command_parser
+import commands
 from auth import exchange_code
 
 load_dotenv()
@@ -16,6 +18,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
 
 # --- OAuth Callback Server ---
@@ -68,13 +71,28 @@ def start_callback_server():
 
 @client.event
 async def on_ready():
+    await tree.sync()
     print(f"Logged in as {client.user}")
+    print("Slash commands synced.")
 
 
+# UI embed helper
+def make_embed(title: str, description: str, color=discord.Color.blue()):
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+    )
+    embed.set_footer(text="Simon Calendar Assistant")
+    return embed
+
+
+# Legacy @Simon function
 @client.event
 async def on_message(message: discord.Message):
     if message.author.bot:
         return
+
     if client.user not in message.mentions:
         return
 
@@ -83,7 +101,136 @@ async def on_message(message: discord.Message):
     await message.reply(response)
 
 
+# --- Slash Commands ---
+
+
+@tree.command(name="help", description="Show Simon commands")
+async def help_command(interaction: discord.Interaction):
+    response = await commands.help_slash()
+
+    await interaction.response.send_message(
+        embed=make_embed("Simon Help", response),
+        ephemeral=True,
+    )
+
+
+@tree.command(name="link", description="Link your Google Calendar")
+async def link_command(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    response = await commands.link_slash(str(interaction.user.id))
+
+    await interaction.followup.send(
+        embed=make_embed("Link Google Calendar", response),
+        ephemeral=True,
+    )
+
+
+@tree.command(name="unlink", description="Unlink your Google Calendar")
+async def unlink_command(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    response = await commands.unlink_slash(str(interaction.user.id))
+
+    await interaction.followup.send(
+        embed=make_embed("Unlink Google Calendar", response),
+        ephemeral=True,
+    )
+
+
+@tree.command(name="info", description="Show events on a date")
+@app_commands.describe(date="Example: 05.20.2026")
+async def info_command(interaction: discord.Interaction, date: str):
+    await interaction.response.defer()
+
+    response = await commands.info_slash(str(interaction.user.id), date)
+
+    await interaction.followup.send(
+        embed=make_embed("Calendar Info", response)
+    )
+
+
+@tree.command(name="add", description="Add a calendar event")
+@app_commands.describe(
+    title="Event title",
+    date="Example: 05.20.2026",
+    time="Example: 12:00 PM",
+    location="Event location",
+    description="Event description",
+)
+async def add_command(
+    interaction: discord.Interaction,
+    title: str,
+    date: str,
+    time: str,
+    location: str,
+    description: str,
+):
+    await interaction.response.defer()
+
+    response = await commands.add_slash(
+        str(interaction.user.id),
+        title,
+        date,
+        time,
+        location,
+        description,
+    )
+
+    await interaction.followup.send(
+        embed=make_embed("Add Event", response, discord.Color.green())
+    )
+
+
+@tree.command(name="edit", description="Edit a calendar event")
+@app_commands.describe(
+    event_id="Event ID",
+    field="Field to edit",
+    new_value="New value",
+)
+@app_commands.choices(
+    field=[
+        app_commands.Choice(name="title", value="title"),
+        app_commands.Choice(name="date", value="date"),
+        app_commands.Choice(name="time", value="time"),
+        app_commands.Choice(name="location", value="location"),
+        app_commands.Choice(name="description", value="description"),
+    ]
+)
+async def edit_command(
+    interaction: discord.Interaction,
+    event_id: str,
+    field: app_commands.Choice[str],
+    new_value: str,
+):
+    await interaction.response.defer()
+
+    response = await commands.edit_slash(
+        str(interaction.user.id),
+        event_id,
+        field.value,
+        new_value,
+    )
+
+    await interaction.followup.send(
+        embed=make_embed("Edit Event", response)
+    )
+
+
+@tree.command(name="delete", description="Delete a calendar event")
+@app_commands.describe(event_id="Event ID")
+async def delete_command(interaction: discord.Interaction, event_id: str):
+    await interaction.response.defer()
+
+    response = await commands.delete_slash(str(interaction.user.id), event_id)
+
+    await interaction.followup.send(
+        embed=make_embed("Delete Event", response, discord.Color.red())
+    )
+
+
 # --- Startup ---
+
 
 if __name__ == "__main__":
     from database import init_db

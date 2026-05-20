@@ -266,12 +266,7 @@ def test_add_attendee_success():
 
 
 def test_add_attendee_success():
-    mock_service = MagicMock()
-    mock_service.events().get().execute.return_value = {
-        "summary": "Scrum Meeting",
-        "start": {"date": "2026-05-19"},
-        "attendees": [],
-    }
+    # ... keep your existing mock setup up here ...
     mock_service.events().update().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"date": "2026-05-19"},
@@ -282,6 +277,8 @@ def test_add_attendee_success():
         result = edit_event(
             make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
         )
+    # ADD THIS ASSERTION TO FIX THE UNUSED VARIABLE
+    assert result.attendees == ["test_user@uw.edu"]
 
 
 def test_add_attendee_duplicate():
@@ -300,12 +297,7 @@ def test_add_attendee_duplicate():
 
 
 def test_remove_attendee_success():
-    mock_service = MagicMock()
-    mock_service.events().get().execute.return_value = {
-        "summary": "Scrum Meeting",
-        "start": {"date": "2026-05-19"},
-        "attendees": [{"displayName": "test_user@uw.edu"}],
-    }
+    # ... keep your existing mock setup up here ...
     mock_service.events().update().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"date": "2026-05-19"},
@@ -316,6 +308,8 @@ def test_remove_attendee_success():
         result = edit_event(
             make_mock_creds(), "abc123", remove_attendee="test_user@uw.edu"
         )
+    # ADD THIS ASSERTION TO FIX THE UNUSED VARIABLE
+    assert result.attendees == []
 
 
 def test_remove_attendee_not_found():

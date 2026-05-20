@@ -173,6 +173,7 @@ async def test_add_description_with_hyphens(mock_message):
     event_arg = mock_add.call_args[0][1]  # creds is arg[0], event is arg[1]
     assert event_arg.description == "Bring"
 
+
 # --- delete ---
 
 

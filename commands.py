@@ -106,7 +106,7 @@ async def add(args: list[str], message: discord.Message) -> str:
         time=args[2],
         location=args[3],
         description=args[4],
-        attendees=[message.author.mention]  # Creator automatically added
+        attendees=[message.author.mention],  # Creator automatically added
     )
 
     created = add_event(creds, new_event)
@@ -132,13 +132,13 @@ async def edit(args: list[str], message: discord.Message) -> str:
     if field_to_edit == "attending_people":
         if len(args) < 4:
             return "⚠️ **Invalid format.** Use: `@Simon/edit-<event_id>-attending_people-<add/remove>-<name>`"
-        
+
         action = args[2].lower()
         person = "-".join(args[3:])
-        
+
         if person.lower() == "me":
-            person = message.author.mention 
-            
+            person = message.author.mention
+
         if action == "add":
             updated = edit_event(creds, event_id, add_attendee=person)
             if updated == "duplicate":
@@ -149,13 +149,15 @@ async def edit(args: list[str], message: discord.Message) -> str:
                 return f"⚠️ **{person}** was not found on the attendee list."
         else:
             return "⚠️ **Invalid action.** You must use `add` or `remove`."
-            
+
         if not updated:
             return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
-            
-        attendee_list_str = ", ".join(updated.attendees) if updated.attendees else "None"
+
+        attendee_list_str = (
+            ", ".join(updated.attendees) if updated.attendees else "None"
+        )
         return f"✅ **Attendee List Updated!**\nCurrent attendees for **{updated.title}**: {attendee_list_str}"
-    
+
     # --- ORIGINAL FIELD LOGIC ---
     new_value = "-".join(args[2:])
     valid_fields = ["title", "date", "time", "location", "description"]

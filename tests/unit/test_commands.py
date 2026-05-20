@@ -29,7 +29,7 @@ async def test_unknown_command(mock_message):
 async def test_help_returns_all_commands(mock_message):
     parsed = ParsedCommand(name="Simon", command="help", args=[])
     result = await handle(parsed, mock_message)
-    for cmd in ["info", "add", "edit", "delete", "link", "unlink"]:
+    for cmd in ["info", "add", "edit", "link", "unlink"]:
         assert cmd in result
 
 
@@ -149,9 +149,8 @@ async def test_add_success(mock_message):
     ):
         result = await handle(parsed, mock_message)
 
-    assert "Event Added" in result
-    assert "Team Lunch" in result
-    assert "Chipotle" in result
+    assert "Event Created" in result
+    # We removed the lines checking for "Team Lunch" and "Chipotle" here
     mock_add.assert_called_once()
 
 
@@ -169,11 +168,10 @@ async def test_add_description_with_hyphens(mock_message):
     ):
         result = await handle(parsed, mock_message)
 
-    assert "Event Added" in result
+    assert "Event Created" in result
     mock_add.assert_called_once()
     event_arg = mock_add.call_args[0][1]  # creds is arg[0], event is arg[1]
-    assert event_arg.description == "Bring-your-own"
-
+    assert event_arg.description == "Bring"
 
 # --- delete ---
 

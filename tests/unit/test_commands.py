@@ -296,6 +296,7 @@ async def test_edit_all_valid_fields(field, mock_message):
         result = await handle(parsed, mock_message)
     assert "Event Updated" in result
 
+
 # --- slash command helpers ---
 
 

@@ -68,15 +68,14 @@ async def on_message(message: discord.Message):
         return
     if client.user not in message.mentions:
         return
+    text = re.sub(r"<@!?\d+>", "@Simon", message.content).strip()
+    response = await command_parser.parse(text, message)
+    await message.reply(response)
 
 
 @client.event
 async def on_interaction(interaction: discord.Interaction):
-    await client.process_application_commands(interaction)
-
-    text = re.sub(r"<@!?\d+>", "@Simon", message.content).strip()
-    response = await command_parser.parse(text, message)
-    await message.reply(response)
+    pass
 
 
 # --- Startup ---

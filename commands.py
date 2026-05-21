@@ -158,7 +158,7 @@ async def info(args: list[str], message: discord.Message) -> str:
         matched_attendee_names = set()
 
         for e in events:
-            attendees_list = getattr(e, 'attendees', []) or []
+            attendees_list = getattr(e, "attendees", []) or []
             for attendee in attendees_list:
                 attendees = str(attendee).lower()
                 if attendee_filter in attendees:

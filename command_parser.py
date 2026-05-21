@@ -36,7 +36,7 @@ async def parse(text: str, message: discord.Message) -> str:
         else:
             command = rest
             args = []
-            
+
     if not command:
         return "I didn't understand that. Try `@Simon/help`."
 

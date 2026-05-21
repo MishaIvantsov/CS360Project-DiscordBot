@@ -21,6 +21,7 @@ class Event:
     description: str
     attendees: list[str] = None
 
+
 # --- Service Builder ---
 
 
@@ -77,7 +78,9 @@ def _to_google_event(event: Event) -> dict:
 # --- API Functions ---
 
 
-def get_events_by_date(creds: OAuth2Credentials, date: str, end_date: str = None) -> list[Event]:
+def get_events_by_date(
+    creds: OAuth2Credentials, date: str, end_date: str = None
+) -> list[Event]:
     """Return all events on a given date (MM.DD.YYYY) or data range (MM.DD.YYYY:MM.DD.YYYY)."""
     service = get_calendar_service(creds)
 
@@ -117,9 +120,7 @@ def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
     """Return a single event by its Google Calendar ID, or None if not found."""
     service = get_calendar_service(creds)
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
-        )
+        g_event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
         return _to_event(g_event)
     except Exception:
         return None
@@ -137,9 +138,7 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
     """Update fields on an existing event. Returns the updated event or None."""
     service = get_calendar_service(creds)
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
-        )
+        g_event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
     except Exception:
         return None
 

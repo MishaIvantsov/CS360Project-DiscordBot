@@ -76,7 +76,6 @@ async def link(args: list[str], message: discord.Message) -> str:
 
 
 async def unlink(args: list[str], message: discord.Message) -> str:
-
     discord_id = str(message.author.id)
     success = delete_token(discord_id)
     if not success:
@@ -101,7 +100,7 @@ async def info(args: list[str], message: discord.Message) -> str:
 
     range_pattern = r"^(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$"
     single_date_pattern = r"^\d{2}\.\d{2}\.\d{4}$"
-    
+
     start_date = None
     end_date = None
     attendee_filter = None
@@ -115,7 +114,7 @@ async def info(args: list[str], message: discord.Message) -> str:
             end_date = range_match.group(2)
             active_filters.append(f"Range: '{arg}'")
             continue
-        
+
         if re.match(single_date_pattern, arg):
             start_date = arg
             active_filters.append(f"Date: '{arg}'")
@@ -145,7 +144,7 @@ async def info(args: list[str], message: discord.Message) -> str:
 
     try:
         fetch_date = start_date if start_date else today_dt.strftime("%m.%d.%Y")
-        events = get_events_by_date(creds, fetch_date, end_date=end_date)                            
+        events = get_events_by_date(creds, fetch_date, end_date=end_date)
     except TypeError:
         events = get_events_by_date(creds, start_date or today_dt.strftime("%m.%d.%Y"))
 
@@ -179,7 +178,9 @@ async def info(args: list[str], message: discord.Message) -> str:
             return f" **No events found** containing attendee: '{attendee_filter}' inside this date range."
 
     try:
-        events.sort(key=lambda x: getattr(x, 'time', "") or getattr(x,'start_time', ''))
+        events.sort(
+            key=lambda x: getattr(x, "time", "") or getattr(x, "start_time", "")
+        )
     except Exception:
         pass
 
@@ -187,31 +188,37 @@ async def info(args: list[str], message: discord.Message) -> str:
     embed = discord.Embed(
         title="📅 Calendar Filter Output",
         description=f"**Active Filters:** {filter_header}\n**Total Matches:** `{len(events)}` event(s)",
-        color=discord.Color.teal()
+        color=discord.Color.teal(),
     )
-    
+
     display_limit = 10
     truncated_events = events[:display_limit]
 
     for index, e in enumerate(truncated_events, start=1):
-        location = getattr(e, 'location', 'No location specified') or 'No location specified'
-        description = getattr(e, 'description', 'No details provided') or 'No details provided'
-        event_time = getattr(e, 'time', 'Unknown Time')
+        location = (
+            getattr(e, "location", "No location specified") or "No location specified"
+        )
+        description = (
+            getattr(e, "description", "No details provided") or "No details provided"
+        )
+        event_time = getattr(e, "time", "Unknown Time")
 
         value_field = (
             f"🕒**Time:** {event_time}\n"
             f"📍 **Location:** {location}\n"
             f"📝 **Details:** {description}"
         )
-        
+
         embed.add_field(
             name=f"{index}, {e.title} (ID: {e.id})",
             value=value_field,
-            inline=False
+            inline=False,
         )
 
     if len(events) > display_limit:
-        embed.set_footer(text=f"Showing 1-{display_limit} of {len(events)} items. Use pagination to view more.")
+        embed.set_footer(
+            text=f"Showing 1-{display_limit} of {len(events)} items. Use pagination to view more."
+        )
 
     await message.channel.send(embed=embed)
 

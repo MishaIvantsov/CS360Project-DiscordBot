@@ -82,8 +82,14 @@ async def unlink(args: list[str], message: discord.Message) -> str:
 
 
 async def info(args: list[str], message: discord.Message) -> str:
-    if len(args) < 1:
-        return "⚠️ **Missing date.** Please use: `@Simon/info-<MM.DD.YYYY>`"
+    if not args or (len(args) == 1 and args[0] == "":
+        return (
+            "⚠️ **Missing criteria.** Please use: \n"
+            "`@Simon/info-<MM.DD.YYYY>` \n"
+            "'@Simon/info-today' \n"
+            "'@Simon/info-this-week-Joe' \n"
+            "'@Simon/info-07.01.2025:07.31.2025'"
+        )
 
     creds, error = _get_creds_or_error(message)
     if error:

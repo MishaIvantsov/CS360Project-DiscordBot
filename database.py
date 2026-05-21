@@ -49,6 +49,14 @@ def init_db() -> None:
                 email        TEXT NOT NULL
             )
             """)
+        conn.execute("""
+             CREATE TABLE IF NOT EXISTS poll_attendees (
+                 message_id  TEXT NOT NULL,
+                 discord_id  TEXT NOT NULL,
+                 PRIMARY KEY (message_id, discord_id),
+                 FOREIGN KEY (message_id) REFERENCES polls(message_id)
+            )
+            """)
         conn.commit()
 
 
@@ -203,3 +211,23 @@ def get_email(discord_id: str) -> str | None:
             (discord_id,),
         ).fetchone()
     return row["email"] if row else None
+
+def add_poll_attendee(message_id: str, discord_id: str) -> None:
+    with _get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO poll_attendees (message_id, discord_id)
+            VALUES (?, ?)
+            """,
+            (message_id, discord_id),
+        )
+        conn.commit()
+
+
+def is_poll_attendee(message_id: str, discord_id: str) -> bool:
+    with _get_connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM poll_attendees WHERE message_id = ? AND discord_id = ?",
+            (message_id, discord_id),
+        ).fetchone()
+    return row is not None

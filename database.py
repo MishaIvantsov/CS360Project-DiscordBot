@@ -16,15 +16,18 @@ def _get_connection() -> sqlite3.Connection:
 def init_db() -> None:
     """Create the tokens table if it doesn't exist."""
     with _get_connection() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_tokens (
                 discord_id TEXT PRIMARY KEY,
                 token       TEXT NOT NULL,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS polls (
                 message_id TEXT PRIMARY KEY,
                 channel_id TEXT NOT NULL,
@@ -33,8 +36,10 @@ def init_db() -> None:
                 is_closed  INTEGER NOT NULL DEFAULT 0,
                 created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS votes (
                 message_id   TEXT NOT NULL,
                 discord_id   TEXT NOT NULL,
@@ -42,13 +47,16 @@ def init_db() -> None:
                 PRIMARY KEY  (message_id, discord_id),
                 FOREIGN KEY  (message_id) REFERENCES polls(message_id)
             )
-            """)
-        conn.execute("""
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_emails (
                 discord_id   TEXT PRIMARY KEY,
                 email        TEXT NOT NULL
             )
-            """)
+            """
+        )
         conn.commit()
 
 

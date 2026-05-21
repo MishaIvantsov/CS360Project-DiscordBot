@@ -211,6 +211,7 @@ async def test_delete_success(mock_message):
     with (
         patch("commands.get_credentials", return_value=MagicMock()),
         patch("commands.delete_event", return_value=True),
+        patch("commands.get_poll_by_event", return_value=None),
     ):
         result = await handle(parsed, mock_message)
     assert "Event Deleted" in result

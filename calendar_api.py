@@ -156,3 +156,60 @@ def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def search_events_by_title(creds: OAuth2Credentials, title: str) -> list[Event]:
+    """Search for upcoming events with title containing the given string."""
+    service = get_calendar_service(creds)
+    result = (
+        service.events()
+        .list(
+            calendarId=CALENDAR_ID,
+            q=title,
+            singleEvents=True,
+            orderBy="startTime",
+            timeMin=datetime.now(timezone.utc).isoformat(),
+        )
+        .execute()
+    )
+    return [_to_event(e) for e in result.get("items", [])]
+
+
+def add_attendee(creds: OAuth2Credentials, event_id: str, email: str) -> bool:
+    """Add a single attendee to an event by email. Returns True if success."""
+    service = get_calendar_service(creds)
+    try:
+        g_event = (
+            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        )
+        attendees = g_event.get("attendees", [])
+        if any(a["email"] == email for a in attendees):
+            return True
+        attendees.append({"email": email})
+        g_event["attendees"] = attendees
+        service.events().update(
+            calendarId=CALENDAR_ID, eventId=event_id, body=g_event
+        ).execute()
+        return True
+    except Exception:
+        return False
+
+
+def remove_attendee(creds: OAuth2Credentials, event_id: str, email: str) -> bool:
+    """Remove attendee from an event by email. Returns True if successful."""
+    service = get_calendar_service(creds)
+    try:
+        g_event = (
+            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        )
+        attendees = g_event.get("attendees", [])
+        updated = [a for a in attendees if a["email"] != email]
+        if len(updated) == len(attendees):
+            return True
+        g_event["attendees"] = updated
+        service.events().update(
+            calendarId=CALENDAR_ID, eventId=event_id, body=g_event
+        ).execute()
+        return True
+    except Exception:
+        return False

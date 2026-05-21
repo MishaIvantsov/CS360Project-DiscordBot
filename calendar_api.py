@@ -125,7 +125,11 @@ def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
     """Return a single event by its Google Calendar ID, or None if not found."""
     service = get_calendar_service(creds)
     try:
-        g_event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        g_event = (
+            service.events()
+            .get(calendarId=CALENDAR_ID, eventId=event_id)
+            .execute()
+        )
         return _to_event(g_event)
     except Exception:
         return None
@@ -135,7 +139,9 @@ def add_event(creds: OAuth2Credentials, event: Event) -> Event:
     """Add a new event to the calendar. Returns the created event with its real ID."""
     service = get_calendar_service(creds)
     g_event = _to_google_event(event)
-    created = service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
+    created = (
+        service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
+    )
     return _to_event(created)
 
 
@@ -143,7 +149,11 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
     """Update fields on an existing event. Returns the updated event or None."""
     service = get_calendar_service(creds)
     try:
-        g_event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        g_event = (
+            service.events()
+            .get(calendarId=CALENDAR_ID, eventId=event_id)
+            .execute()
+        )
     except Exception:
         return None
 
@@ -157,7 +167,9 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
         current = _to_event(g_event)
         new_date = kwargs.get("date", current.date)
         new_time = kwargs.get("time", current.time)
-        dt = datetime.strptime(f"{new_date} {new_time}", "%m.%d.%Y %I:%M %p")
+        dt = datetime.strptime(
+            f"{new_date} {new_time}", "%m.%d.%Y %I:%M %p"
+        )
         dt_end = dt + timedelta(hours=1)
         g_event["start"] = {"dateTime": dt.isoformat(), "timeZone": "UTC"}
         g_event["end"] = {"dateTime": dt_end.isoformat(), "timeZone": "UTC"}

@@ -181,7 +181,8 @@ async def info(args: list[str], message: discord.Message) -> str:
         events.sort(
             key=lambda x: getattr(x, "time", "") or getattr(x, "start_time", "")
         )
-    except Exception:
+    except (AttributeError, TypeError):
+        # Sorting failed, but events are still usable in their current order
         pass
 
     filter_header = " | ".join(active_filters) if active_filters else "Global Search"

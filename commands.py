@@ -114,9 +114,7 @@ class PollView(discord.ui.View):
                 remove_attendee(self.creds, self.event_id, email)
 
         save_vote(message_id, discord_id, "maybe")
-        await interaction.response.send_message(
-            "Recorded as Maybe.", ephemeral=True
-        )
+        await interaction.response.send_message("Recorded as Maybe.", ephemeral=True)
 
     @discord.ui.button(label="Can't make it", style=discord.ButtonStyle.danger)
     async def cant(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -204,6 +202,7 @@ async def poll(args: list[str], message: discord.Message) -> str:
 
     return f"✅ Poll created for **{event.title}**."
 
+
 async def close_poll_cmd(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
         return "⚠️ **Missing event ID.** Use: `@Simon/close-poll-<event_id>`"
@@ -227,6 +226,7 @@ async def close_poll_cmd(args: list[str], message: discord.Message) -> str:
             pass
 
     return "✅ Poll closed."
+
 
 async def rsvp_summary(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
@@ -254,6 +254,7 @@ async def rsvp_summary(args: list[str], message: discord.Message) -> str:
         f"🤔 Maybe ({len(maybe)}): {fmt(maybe)}\n"
         f"❌ Can't make it ({len(cant)}): {fmt(cant)}"
     )
+
 
 async def reissue_poll(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
@@ -283,7 +284,8 @@ async def reissue_poll(args: list[str], message: discord.Message) -> str:
         try:
             old_msg = await channel.fetch_message(int(old_poll["message_id"]))
             await old_msg.edit(
-                content=old_msg.content + "\n\n🔒 **This poll has been closed. A new poll has been issued with updated event details.**",
+                content=old_msg.content
+                + "\n\n🔒 **This poll has been closed. A new poll has been issued with updated event details.**",
                 view=ClosedPollView(),
             )
         except Exception:
@@ -313,6 +315,7 @@ async def reissue_poll(args: list[str], message: discord.Message) -> str:
 
     return f"✅ Poll reissued for **{event.title}**."
 
+
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
     handlers = {
         "edit": edit,
@@ -326,7 +329,6 @@ async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
         "close-poll": close_poll_cmd,
         "rsvp": rsvp_summary,
         "reissue-poll": reissue_poll,
-
     }
 
     handler = handlers.get(parsed.command)
@@ -489,7 +491,7 @@ async def delete(args: list[str], message: discord.Message) -> str:
 
     if not success:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
-    
+
     active_poll = get_poll_by_event(event_id)
     if active_poll:
         close_poll(active_poll["message_id"])
@@ -498,7 +500,8 @@ async def delete(args: list[str], message: discord.Message) -> str:
             try:
                 poll_msg = await channel.fetch_message(int(active_poll["message_id"]))
                 await poll_msg.edit(
-                    content=poll_msg.content + "\n\n❌ **This event has been cancelled. The poll is now closed.**",
+                    content=poll_msg.content
+                    + "\n\n❌ **This event has been cancelled. The poll is now closed.**",
                     view=ClosedPollView(),
                 )
             except Exception:

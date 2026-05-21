@@ -212,6 +212,7 @@ def get_email(discord_id: str) -> str | None:
         ).fetchone()
     return row["email"] if row else None
 
+
 def add_poll_attendee(message_id: str, discord_id: str) -> None:
     with _get_connection() as conn:
         conn.execute(

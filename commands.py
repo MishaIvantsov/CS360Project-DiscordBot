@@ -160,8 +160,8 @@ async def info(args: list[str], message: discord.Message) -> str:
         for e in events:
             attendees_list = getattr(e, "attendees", []) or []
             for attendee in attendees_list:
-                attendees = str(attendee).lower()
-                if attendee_filter in attendees:
+                attendee_str = str(attendee).lower()
+                if attendee_filter in attendee_str:
                     filtered_events.append(e)
                     matched_attendee_names.add(str(attendee))
                     break
@@ -206,8 +206,8 @@ async def info(args: list[str], message: discord.Message) -> str:
         
         embed.add_field(
             name=f"{index}, {e.title} (ID: {e.id})",
-            value = value_field,
-            inline = False
+            value=value_field,
+            inline=False
         )
 
     if len(events) > display_limit:

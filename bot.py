@@ -24,6 +24,14 @@ client = discord.Client(intents=intents)
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
+
+        # --- ADDED: Fly.io Health Check Endpoint ---
+        if parsed.path == "/health":
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+            return
+
         params = parse_qs(parsed.query)
 
         code = params.get("code", [None])[0]
@@ -49,7 +57,9 @@ class CallbackHandler(BaseHTTPRequestHandler):
 
 
 def start_callback_server():
-    server = HTTPServer(("localhost", 8080), CallbackHandler)
+    # --- FIXED: Bind to 0.0.0.0 and use Fly's injected PORT ---
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), CallbackHandler)  # nosec B104
     server.serve_forever()
 
 
@@ -82,6 +92,8 @@ if __name__ == "__main__":
 
     thread = threading.Thread(target=start_callback_server, daemon=True)
     thread.start()
-    print("OAuth callback server running on http://localhost:8080")
+
+    port = int(os.environ.get("PORT", 8080))
+    print(f"OAuth callback server running on http://0.0.0.0:{port}")
 
     client.run(os.getenv("DISCORD_TOKEN", ""))

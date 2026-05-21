@@ -145,9 +145,7 @@ async def info_command(interaction: discord.Interaction, date: str):
 
     response = await commands.info_slash(str(interaction.user.id), date)
 
-    await interaction.followup.send(
-        embed=make_embed("Calendar Info", response)
-    )
+    await interaction.followup.send(embed=make_embed("Calendar Info", response))
 
 
 @tree.command(name="add", description="Add a calendar event")
@@ -212,9 +210,7 @@ async def edit_command(
         new_value,
     )
 
-    await interaction.followup.send(
-        embed=make_embed("Edit Event", response)
-    )
+    await interaction.followup.send(embed=make_embed("Edit Event", response))
 
 
 @tree.command(name="delete", description="Delete a calendar event")

@@ -4,10 +4,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 from commands import PollView, ClosedPollView
-
 import discord
 from dotenv import load_dotenv
-
 import command_parser
 from auth import exchange_code
 
@@ -50,7 +48,8 @@ class CallbackHandler(BaseHTTPRequestHandler):
 
 
 def start_callback_server():
-    server = HTTPServer(("localhost", 8080), CallbackHandler)
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), CallbackHandler)  # nosec B104
     server.serve_forever()
 
 
@@ -90,6 +89,7 @@ if __name__ == "__main__":
 
     thread = threading.Thread(target=start_callback_server, daemon=True)
     thread.start()
-    print("OAuth callback server running on http://localhost:8080")
+    port = int(os.environ.get("PORT", 8080))
+    print(f"OAuth callback server running on http://0.0.0.0:{port}")
 
     client.run(os.getenv("DISCORD_TOKEN", ""))

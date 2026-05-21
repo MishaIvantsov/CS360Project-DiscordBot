@@ -1,11 +1,23 @@
 from __future__ import annotations
-from database import delete_token
+from database import (
+    delete_token,
+    save_poll,
+    get_poll,
+    get_vote,
+    get_email,
+    save_email,
+    save_vote,
+)
 import discord
+import discord.ui
 from calendar_api import (
     get_events_by_date,
     add_event,
     delete_event,
     edit_event,
+    get_event_by_id,
+    search_events_by_title,
+    add_attendee,
     Event,
 )
 from auth import get_auth_url, get_credentials
@@ -15,6 +27,177 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from command_parser import ParsedCommand
+
+# --- Poll UI ---
+
+
+class EmailModal(discord.ui.Modal, title="Enter your Google email"):
+    email = discord.ui.TextInput(
+        label="Google Email",
+        placeholder="you@gmail.com",
+        required=True,
+    )
+
+    def __init__(self, poll_message_id: str, event_id: str, creds):
+        super().__init__()
+        self.poll_message_id = poll_message_id
+        self.event_id = event_id
+        self.creds = creds
+
+    async def on_submit(self, interaction: discord.Interaction):
+        email = str(self.email)
+        discord_id = str(interaction.user.id)
+        save_email(discord_id, email)
+        save_vote(self.poll_message_id, discord_id, "going")
+        success = add_attendee(self.creds, self.event_id, email)
+        if success:
+            await interaction.response.send_message(
+                "You're on the list!", ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                "Could not add you to the Calendar event. Try again later.",
+                ephemeral=True,
+            )
+
+
+class PollView(discord.ui.View):
+    def __init__(self, event_id: str, creds):
+        super().__init__(timeout=None)
+        self.event_id = event_id
+        self.creds = creds
+
+    @discord.ui.button(label="Going", style=discord.ButtonStyle.success)
+    async def going(self, interaction: discord.Interaction, button: discord.ui.Button):
+        discord_id = str(interaction.user.id)
+        message_id = str(interaction.message.id)
+
+        poll = get_poll(message_id)
+        if not poll or poll["is_closed"]:
+            await interaction.response.send_message(
+                "This poll is closed.", ephemeral=True
+            )
+            return
+
+        existing_email = get_email(discord_id)
+        if existing_email:
+            save_vote(message_id, discord_id, "going")
+            add_attendee(self.creds, self.event_id, existing_email)
+            await interaction.response.send_message(
+                "You're on the list!", ephemeral=True
+            )
+        else:
+            modal = EmailModal(message_id, self.event_id, self.creds)
+            await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Maybe", style=discord.ButtonStyle.primary)
+    async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        discord_id = str(interaction.user.id)
+        message_id = str(interaction.message.id)
+
+        poll = get_poll(message_id)
+        if not poll or poll["is_closed"]:
+            await interaction.response.send_message(
+                "This poll is closed.", ephemeral=True
+            )
+            return
+
+        prev_vote = get_vote(message_id, discord_id)
+        if prev_vote == "going":
+            email = get_email(discord_id)
+            if email:
+                add_attendee(self.creds, self.event_id, email)
+
+        save_vote(message_id, discord_id, "maybe")
+        await interaction.response.send_message(
+            "Got it — recorded as Maybe.", ephemeral=True
+        )
+
+    @discord.ui.button(label="Can't make it", style=discord.ButtonStyle.danger)
+    async def cant(self, interaction: discord.Interaction, button: discord.ui.Button):
+        discord_id = str(interaction.user.id)
+        message_id = str(interaction.message.id)
+
+        poll = get_poll(message_id)
+        if not poll or poll["is_closed"]:
+            await interaction.response.send_message(
+                "This poll is closed.", ephemeral=True
+            )
+            return
+
+        prev_vote = get_vote(message_id, discord_id)
+        if prev_vote == "going":
+            email = get_email(discord_id)
+            if email:
+                add_attendee(self.creds, self.event_id, email)
+
+        save_vote(message_id, discord_id, "cant")
+        await interaction.response.send_message(
+            "Recorded as Can't make it.", ephemeral=True
+        )
+
+
+class ClosedPollView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Going", style=discord.ButtonStyle.success, disabled=True)
+    async def going(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+    @discord.ui.button(label="Maybe", style=discord.ButtonStyle.primary, disabled=True)
+    async def maybe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+    @discord.ui.button(
+        label="Can't make it", style=discord.ButtonStyle.danger, disabled=True
+    )
+    async def cant(self, interaction: discord.Interaction, button: discord.ui.Button):
+        pass
+
+
+async def poll(args: list[str], message: discord.Message) -> str:
+    if len(args) < 1:
+        return "⚠️ **Missing event.** Use: `@Simon/poll-<event_id or title>`"
+
+    creds, error = _get_creds_or_error(message)
+    if error:
+        return error
+    assert creds is not None
+
+    query = "-".join(args)
+    event = get_event_by_id(creds, query)
+
+    if event is None:
+        results = search_events_by_title(creds, query)
+        if not results:
+            return f"⚠️ No event found matching **{query}**."
+        if len(results) == 1:
+            event = results[0]
+        else:
+            lines = ["Multiple events found. Use the event ID:\n"]
+            for e in results:
+                lines.append(f"**[{e.id}]** {e.title} — {e.date} {e.time}")
+            return "\n".join(lines)
+
+    location_line = f"📍 {event.location}\n" if event.location else ""
+    poll_text = (
+        f"**{event.title}**\n"
+        f"📅 {event.date} at {event.time}\n"
+        f"{location_line}"
+        f"\nAre you going?"
+    )
+
+    view = PollView(event.id, creds)
+    poll_message = await message.channel.send(poll_text, view=view)
+    save_poll(
+        str(poll_message.id),
+        str(message.channel.id),
+        event.id,
+        str(message.author.id),
+    )
+
+    return f"✅ Poll created for **{event.title}**."
 
 
 async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
@@ -26,6 +209,7 @@ async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
         "help": help_cmd,
         "link": link,
         "unlink": unlink,
+        "poll": poll,
     }
 
     handler = handlers.get(parsed.command)
@@ -187,5 +371,6 @@ async def help_cmd(args: list[str], message: discord.Message) -> str:
         "`@Simon/info-<MM.DD.YYYY>` — list events on a date\n"
         "`@Simon/add-<title>-<date>-<time>-<location>-<description>` — add event\n"
         "`@Simon/edit-<id>-<field>-<value>` — edit an event\n"
-        "`@Simon/delete-<id>` — delete an event"
+        "`@Simon/delete-<id>` — delete an event\n"
+        "`@Simon/poll-<event_id or title>` — create a poll for an event"
     )

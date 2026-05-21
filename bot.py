@@ -3,6 +3,7 @@ import re
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
+from commands import PollView, ClosedPollView
 
 import discord
 from dotenv import load_dotenv
@@ -68,6 +69,11 @@ async def on_message(message: discord.Message):
     if client.user not in message.mentions:
         return
 
+
+@client.event
+async def on_interaction(interaction: discord.Interaction):
+    await client.process_application_commands(interaction)
+
     text = re.sub(r"<@!?\d+>", "@Simon", message.content).strip()
     response = await command_parser.parse(text, message)
     await message.reply(response)
@@ -79,6 +85,9 @@ if __name__ == "__main__":
     from database import init_db
 
     init_db()
+
+    client.add_view(PollView("", None))
+    client.add_view(ClosedPollView())
 
     thread = threading.Thread(target=start_callback_server, daemon=True)
     thread.start()

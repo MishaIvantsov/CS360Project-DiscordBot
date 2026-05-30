@@ -19,7 +19,7 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
-    attendees: list[str] | None = None
+    attendees: list[str] | None = None  # NEW: Added for Scrum 20
 
 
 # --- Service Builder ---
@@ -47,6 +47,7 @@ def _to_event(g_event: dict) -> Event:
         date = dt.strftime("%m.%d.%Y")
         time = "All Day"
 
+    # Extract attendees from Google's format
     raw_attendees = g_event.get("attendees", [])
     attendee_names = [a.get("displayName", a.get("email", "")) for a in raw_attendees]
 
@@ -57,7 +58,7 @@ def _to_event(g_event: dict) -> Event:
         time=time,
         location=g_event.get("location", ""),
         description=g_event.get("description", ""),
-        attendees=attendee_names,
+        attendees=attendee_names,  # NEW
     )
 
 
@@ -66,6 +67,7 @@ def _to_google_event(event: Event) -> dict:
     dt = datetime.strptime(f"{event.date} {event.time}", "%m.%d.%Y %I:%M %p")
     dt_end = dt + timedelta(hours=1)
 
+    # Format attendees for Google API
     g_attendees = []
     if event.attendees:
         for name in event.attendees:
@@ -79,7 +81,7 @@ def _to_google_event(event: Event) -> dict:
         "description": event.description,
         "start": {"dateTime": dt.isoformat(), "timeZone": "UTC"},
         "end": {"dateTime": dt_end.isoformat(), "timeZone": "UTC"},
-        "attendees": g_attendees,
+        "attendees": g_attendees,  # NEW
     }
 
 
@@ -145,6 +147,7 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | str
     except Exception:
         return None
 
+    # Handle Scrum 20 Attending People operations
     if "add_attendee" in kwargs or "remove_attendee" in kwargs:
         current_attendees = g_event.get("attendees", [])
         current_names = [a.get("displayName", "") for a in current_attendees]

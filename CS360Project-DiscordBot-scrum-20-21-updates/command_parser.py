@@ -23,19 +23,8 @@ async def parse(text: str, message: discord.Message) -> str:
     if not name or not rest:
         return "I didn't understand that. Try `@Simon/help`."
 
-    if rest.startswith("info-") or rest == "info":
-        parts = rest.split("-")
-        command = parts[0]
-        args = parts[1:]
-    else:
-        parts = rest.split()
-        if parts:
-            command = parts[0]
-            args = parts[1:]
-        else:
-            command = rest
-            args = []
-
+    parts = rest.split("-")
+    command, *args = parts
     if not command:
         return "I didn't understand that. Try `@Simon/help`."
 

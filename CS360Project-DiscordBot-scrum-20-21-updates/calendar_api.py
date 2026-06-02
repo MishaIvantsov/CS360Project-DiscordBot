@@ -1,11 +1,10 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from google.oauth2.credentials import Credentials as OAuth2Credentials
 from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 load_dotenv()
 
@@ -20,8 +19,7 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
-    attendees: list[str] = None
-    attendees: list[str] | None = None
+    attendees: list[str] | None = None  # NEW: Added for Scrum 20
 
 
 # --- Service Builder ---
@@ -49,8 +47,7 @@ def _to_event(g_event: dict) -> Event:
         date = dt.strftime("%m.%d.%Y")
         time = "All Day"
 
-    g_attendees = g_event.get("attendees", [])
-    attendees_list = [a.get("displayName") or a.get("email", "") for a in g_attendees]
+    # Extract attendees from Google's format
     raw_attendees = g_event.get("attendees", [])
     attendee_names = [a.get("displayName", a.get("email", "")) for a in raw_attendees]
 
@@ -61,8 +58,7 @@ def _to_event(g_event: dict) -> Event:
         time=time,
         location=g_event.get("location", ""),
         description=g_event.get("description", ""),
-        attendees=attendees_list,
-        attendees=attendee_names,
+        attendees=attendee_names,  # NEW
     )
 
 
@@ -71,6 +67,7 @@ def _to_google_event(event: Event) -> dict:
     dt = datetime.strptime(f"{event.date} {event.time}", "%m.%d.%Y %I:%M %p")
     dt_end = dt + timedelta(hours=1)
 
+    # Format attendees for Google API
     g_attendees = []
     if event.attendees:
         for name in event.attendees:
@@ -84,35 +81,13 @@ def _to_google_event(event: Event) -> dict:
         "description": event.description,
         "start": {"dateTime": dt.isoformat(), "timeZone": "UTC"},
         "end": {"dateTime": dt_end.isoformat(), "timeZone": "UTC"},
-        "attendees": g_attendees,
+        "attendees": g_attendees,  # NEW
     }
 
 
 # --- API Functions ---
 
 
-def get_events_by_date(
-    creds: OAuth2Credentials, date: str, end_date: str = None
-) -> list[Event]:
-    """Return all events on a given date (MM.DD.YYYY) or data range (MM.DD.YYYY:MM.DD.YYYY)."""
-    service = get_calendar_service(creds)
-
-    def parse_dt(d_str: str):
-        for fmt in ("%m.%d.%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(d_str, fmt)
-            except ValueError:
-                continue
-        raise ValueError(f"Unsupported format: {d_str}")
-
-    start_dt = parse_dt(date).replace(tzinfo=timezone.utc)
-    time_min = start_dt.isoformat()
-
-    if end_date:
-        end_dt = parse_dt(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
-    else:
-        end_dt = start_dt + timedelta(days=1)
-    time_max = end_dt.isoformat()
 def get_events_by_date(creds: OAuth2Credentials, date_str: str) -> list[Event]:
     """Return all events for a given date (MM.DD.YYYY) from the user's calendar."""
     service = get_calendar_service(creds)
@@ -172,6 +147,7 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | str
     except Exception:
         return None
 
+    # Handle Scrum 20 Attending People operations
     if "add_attendee" in kwargs or "remove_attendee" in kwargs:
         current_attendees = g_event.get("attendees", [])
         current_names = [a.get("displayName", "") for a in current_attendees]

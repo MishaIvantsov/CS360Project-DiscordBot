@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from google.oauth2.credentials import Credentials as OAuth2Credentials
@@ -20,7 +20,6 @@ class Event:
     time: str  # HH:MM AM/PM
     location: str
     description: str
-    attendees: list[str] = None
     attendees: list[str] | None = None
 
 
@@ -51,8 +50,6 @@ def _to_event(g_event: dict) -> Event:
 
     g_attendees = g_event.get("attendees", [])
     attendees_list = [a.get("displayName") or a.get("email", "") for a in g_attendees]
-    raw_attendees = g_event.get("attendees", [])
-    attendee_names = [a.get("displayName", a.get("email", "")) for a in raw_attendees]
 
     return Event(
         id=g_event.get("id", ""),
@@ -62,7 +59,6 @@ def _to_event(g_event: dict) -> Event:
         location=g_event.get("location", ""),
         description=g_event.get("description", ""),
         attendees=attendees_list,
-        attendees=attendee_names,
     )
 
 
@@ -91,28 +87,6 @@ def _to_google_event(event: Event) -> dict:
 # --- API Functions ---
 
 
-def get_events_by_date(
-    creds: OAuth2Credentials, date: str, end_date: str = None
-) -> list[Event]:
-    """Return all events on a given date (MM.DD.YYYY) or data range (MM.DD.YYYY:MM.DD.YYYY)."""
-    service = get_calendar_service(creds)
-
-    def parse_dt(d_str: str):
-        for fmt in ("%m.%d.%Y", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(d_str, fmt)
-            except ValueError:
-                continue
-        raise ValueError(f"Unsupported format: {d_str}")
-
-    start_dt = parse_dt(date).replace(tzinfo=timezone.utc)
-    time_min = start_dt.isoformat()
-
-    if end_date:
-        end_dt = parse_dt(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
-    else:
-        end_dt = start_dt + timedelta(days=1)
-    time_max = end_dt.isoformat()
 def get_events_by_date(creds: OAuth2Credentials, date_str: str) -> list[Event]:
     """Return all events for a given date (MM.DD.YYYY) from the user's calendar."""
     service = get_calendar_service(creds)

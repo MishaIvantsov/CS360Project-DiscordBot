@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -73,15 +74,15 @@ def _to_google_event(event: Event) -> dict:
 # --- API Functions ---
 
 
-def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
+async def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
     """Return all events on a given date (MM.DD.YYYY)."""
     service = get_calendar_service(creds)
     dt = datetime.strptime(date, "%m.%d.%Y").replace(tzinfo=timezone.utc)
     time_min = dt.isoformat()
     time_max = (dt + timedelta(days=1)).isoformat()
 
-    result = (
-        service.events()
+    result = await asyncio.to_thread(
+        lambda: service.events()
         .list(
             calendarId=CALENDAR_ID,
             timeMin=time_min,
@@ -95,32 +96,38 @@ def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]:
     return [_to_event(e) for e in result.get("items", [])]
 
 
-def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
+async def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | None:
     """Return a single event by its Google Calendar ID, or None if not found."""
     service = get_calendar_service(creds)
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        g_event = await asyncio.to_thread(
+            lambda: service.events()
+            .get(calendarId=CALENDAR_ID, eventId=event_id)
+            .execute()
         )
         return _to_event(g_event)
     except Exception:
         return None
 
 
-def add_event(creds: OAuth2Credentials, event: Event) -> Event:
+async def add_event(creds: OAuth2Credentials, event: Event) -> Event:
     """Add a new event to the calendar. Returns the created event with its real ID."""
     service = get_calendar_service(creds)
     g_event = _to_google_event(event)
-    created = service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
+    created = await asyncio.to_thread(
+        lambda: service.events().insert(calendarId=CALENDAR_ID, body=g_event).execute()
+    )
     return _to_event(created)
 
 
-def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
+async def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | None:
     """Update fields on an existing event. Returns the updated event or None."""
     service = get_calendar_service(creds)
     try:
-        g_event = (
-            service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        g_event = await asyncio.to_thread(
+            lambda: service.events()
+            .get(calendarId=CALENDAR_ID, eventId=event_id)
+            .execute()
         )
     except Exception:
         return None
@@ -140,19 +147,23 @@ def edit_event(creds: OAuth2Credentials, event_id: str, **kwargs) -> Event | Non
         g_event["start"] = {"dateTime": dt.isoformat(), "timeZone": "UTC"}
         g_event["end"] = {"dateTime": dt_end.isoformat(), "timeZone": "UTC"}
 
-    updated = (
-        service.events()
+    updated = await asyncio.to_thread(
+        lambda: service.events()
         .update(calendarId=CALENDAR_ID, eventId=event_id, body=g_event)
         .execute()
     )
     return _to_event(updated)
 
 
-def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
+async def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
     """Delete an event by ID. Returns True if deleted, False if not found."""
     service = get_calendar_service(creds)
     try:
-        service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
+        await asyncio.to_thread(
+            lambda: service.events()
+            .delete(calendarId=CALENDAR_ID, eventId=event_id)
+            .execute()
+        )
         return True
     except Exception:
         return False

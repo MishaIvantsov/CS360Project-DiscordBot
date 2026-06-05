@@ -87,7 +87,7 @@ async def info(args: list[str], message: discord.Message) -> str:
     assert creds is not None
 
     date_str = args[0]
-    events = get_events_by_date(creds, date_str)
+    events = await get_events_by_date(creds, date_str)
 
     if not events:
         return f"📅 **No events found** for `{date_str}`."
@@ -118,11 +118,11 @@ async def add(args: list[str], message: discord.Message) -> str:
         date=args[1],
         time=args[2],
         location=args[3],
-        description=args[4],
+        description="-".join(args[4:]),
         attendees=[message.author.mention],  # Creator automatically added
     )
 
-    created = add_event(creds, new_event)
+    created = await add_event(creds, new_event)
     if created is None:
         return "❌ **Error:** Failed to create event on Google Calendar."
 
@@ -153,11 +153,11 @@ async def edit(args: list[str], message: discord.Message) -> str:
             person = message.author.mention
 
         if action == "add":
-            updated = edit_event(creds, event_id, add_attendee=person)
+            updated = await edit_event(creds, event_id, add_attendee=person)
             if updated == "duplicate":
                 return f"⚠️ **{person}** is already on the attendee list."
         elif action == "remove":
-            updated = edit_event(creds, event_id, remove_attendee=person)
+            updated = await edit_event(creds, event_id, remove_attendee=person)
             if updated == "not_found":
                 return f"⚠️ **{person}** was not found on the attendee list."
         else:
@@ -177,7 +177,7 @@ async def edit(args: list[str], message: discord.Message) -> str:
     if field_to_edit not in valid_fields:
         return f"⚠️ **Invalid field.** You can only edit: {', '.join(valid_fields)}, attending_people"
 
-    updated = edit_event(creds, event_id, **{field_to_edit: new_value})
+    updated = await edit_event(creds, event_id, **{field_to_edit: new_value})
 
     if updated is None:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
@@ -198,7 +198,7 @@ async def delete(args: list[str], message: discord.Message) -> str:
     assert creds is not None
 
     event_id = args[0]
-    success = delete_event(creds, event_id)
+    success = await delete_event(creds, event_id)
 
     if not success:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
@@ -245,7 +245,7 @@ async def info_slash(discord_id: str, date: str) -> str:
 
     assert creds is not None
 
-    events = get_events_by_date(creds, date)
+    events = await get_events_by_date(creds, date)
 
     if not events:
         return f"📅 No events found for **{date}**."
@@ -286,7 +286,9 @@ async def add_slash(
         description=description,
     )
 
-    created = add_event(creds, new_event)
+    created = await add_event(creds, new_event)
+    if created is None:
+        return "❌ **Error:** Failed to create event on Google Calendar."
 
     return (
         f"✅ **Event Added!**\n"
@@ -317,7 +319,7 @@ async def edit_slash(
     if field_to_edit not in valid_fields:
         return f"⚠️ **Invalid field.** You can only edit: {', '.join(valid_fields)}"
 
-    updated = edit_event(creds, event_id, **{field_to_edit: new_value})
+    updated = await edit_event(creds, event_id, **{field_to_edit: new_value})
 
     if updated is None:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."
@@ -336,7 +338,7 @@ async def delete_slash(discord_id: str, event_id: str) -> str:
 
     assert creds is not None
 
-    success = delete_event(creds, event_id)
+    success = await delete_event(creds, event_id)
 
     if not success:
         return f"⚠️ **Event Not Found.** No event with ID **{event_id}** exists."

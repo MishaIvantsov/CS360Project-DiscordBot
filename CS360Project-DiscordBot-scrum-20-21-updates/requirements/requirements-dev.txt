@@ -1,0 +1,9 @@
+# Static analysis
+black==26.5.1
+flake8==7.3.0
+bandit==1.9.4
+pre-commit==4.6.0
+
+# Testing
+pytest
+pytest-asyncio

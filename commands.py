@@ -118,7 +118,7 @@ async def add(args: list[str], message: discord.Message) -> str:
         date=args[1],
         time=args[2],
         location=args[3],
-        description="-".join(args[4:]),
+        description=args[4],
         attendees=[message.author.mention],  # Creator automatically added
     )
 

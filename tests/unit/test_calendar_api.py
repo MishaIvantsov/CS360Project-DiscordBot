@@ -1,6 +1,6 @@
 from __future__ import annotations
 from unittest.mock import MagicMock, patch
-import pytest  # noqa: F401
+import pytest
 from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 # Patch Google auth and build before calendar_api loads
@@ -22,9 +22,7 @@ with (
         delete_event,
     )
 
-
 # --- Sample Data ---
-
 SAMPLE_G_EVENT = {
     "id": "abc123",
     "summary": "Team Lunch",
@@ -48,6 +46,7 @@ SAMPLE_EVENT = Event(
     time="12:00 PM",
     location="Chipotle",
     description="Lunch with the team",
+    attendees=["test_user@uw.edu"],
 )
 
 
@@ -57,8 +56,6 @@ def make_mock_creds() -> OAuth2Credentials:
 
 
 # --- _to_event() ---
-
-
 def test_to_event_maps_fields_correctly():
     event = _to_event(SAMPLE_G_EVENT)
     assert event.id == "abc123"
@@ -95,8 +92,6 @@ def test_to_event_missing_optional_fields():
 
 
 # --- _to_google_event() ---
-
-
 def test_to_google_event_maps_fields_correctly():
     g_event = _to_google_event(SAMPLE_EVENT)
     assert g_event["summary"] == "Team Lunch"
@@ -122,130 +117,109 @@ def test_to_google_event_end_is_one_hour_after_start():
 
 
 # --- get_events_by_date() ---
-
-
-def test_get_events_by_date_returns_events():
+@pytest.mark.asyncio
+async def test_get_events_by_date_returns_events():
     mock_service = MagicMock()
     mock_service.events().list().execute.return_value = {"items": [SAMPLE_G_EVENT]}
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = get_events_by_date(make_mock_creds(), "05.01.2026")
+        result = await get_events_by_date(make_mock_creds(), "05.01.2026")
+        assert len(result) == 1
+        assert result[0].title == "Team Lunch"
 
-    assert len(result) == 1
-    assert result[0].title == "Team Lunch"
 
-
-def test_get_events_by_date_returns_empty_list():
+@pytest.mark.asyncio
+async def test_get_events_by_date_returns_empty_list():
     mock_service = MagicMock()
     mock_service.events().list().execute.return_value = {"items": []}
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = get_events_by_date(make_mock_creds(), "01.01.2099")
-
-    assert result == []
+        result = await get_events_by_date(make_mock_creds(), "01.01.2099")
+        assert result == []
 
 
 # --- get_event_by_id() ---
-
-
-def test_get_event_by_id_returns_event():
+@pytest.mark.asyncio
+async def test_get_event_by_id_returns_event():
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = SAMPLE_G_EVENT
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = get_event_by_id(make_mock_creds(), "abc123")
+        result = await get_event_by_id(make_mock_creds(), "abc123")
+        assert result is not None
+        assert result.id == "abc123"
+        assert result.title == "Team Lunch"
 
-    assert result is not None
-    assert result.id == "abc123"
-    assert result.title == "Team Lunch"
 
-
-def test_get_event_by_id_returns_none_when_not_found():
+@pytest.mark.asyncio
+async def test_get_event_by_id_returns_none_when_not_found():
     mock_service = MagicMock()
     mock_service.events().get().execute.side_effect = Exception("Not found")
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = get_event_by_id(make_mock_creds(), "nonexistent")
-
-    assert result is None
+        result = await get_event_by_id(make_mock_creds(), "nonexistent")
+        assert result is None
 
 
 # --- add_event() ---
-
-
-def test_add_event_returns_created_event():
+@pytest.mark.asyncio
+async def test_add_event_returns_created_event():
     mock_service = MagicMock()
     mock_service.events().insert().execute.return_value = SAMPLE_G_EVENT
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = add_event(make_mock_creds(), SAMPLE_EVENT)
+        result = await add_event(make_mock_creds(), SAMPLE_EVENT)
+        assert result.id == "abc123"
+        assert result.title == "Team Lunch"
 
-    assert result.id == "abc123"
-    assert result.title == "Team Lunch"
 
-
-def test_add_event_calls_insert():
+@pytest.mark.asyncio
+async def test_add_event_calls_insert():
     mock_service = MagicMock()
     mock_service.events().insert().execute.return_value = SAMPLE_G_EVENT
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        add_event(make_mock_creds(), SAMPLE_EVENT)
-
-    mock_service.events().insert.assert_called()
+        await add_event(make_mock_creds(), SAMPLE_EVENT)
+        mock_service.events().insert.assert_called()
 
 
 # --- edit_event() ---
-
-
-def test_edit_event_updates_title():
+@pytest.mark.asyncio
+async def test_edit_event_updates_title():
     updated_g_event = {**SAMPLE_G_EVENT, "summary": "Updated Lunch"}
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = dict(SAMPLE_G_EVENT)
     mock_service.events().update().execute.return_value = updated_g_event
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(make_mock_creds(), "abc123", title="Updated Lunch")
+        result = await edit_event(make_mock_creds(), "abc123", title="Updated Lunch")
+        assert result is not None
+        assert result.title == "Updated Lunch"
 
-    assert result is not None
-    assert result.title == "Updated Lunch"
 
-
-def test_edit_event_returns_none_when_not_found():
+@pytest.mark.asyncio
+async def test_edit_event_returns_none_when_not_found():
     mock_service = MagicMock()
     mock_service.events().get().execute.side_effect = Exception("Not found")
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(make_mock_creds(), "nonexistent", title="Whatever")
-
-    assert result is None
+        result = await edit_event(make_mock_creds(), "nonexistent", title="Whatever")
+        assert result is None
 
 
 # --- delete_event() ---
-
-
-def test_delete_event_returns_true_on_success():
+@pytest.mark.asyncio
+async def test_delete_event_returns_true_on_success():
     mock_service = MagicMock()
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = delete_event(make_mock_creds(), "abc123")
+        result = await delete_event(make_mock_creds(), "abc123")
+        assert result is True
 
-    assert result is True
 
-
-def test_delete_event_returns_false_when_not_found():
+@pytest.mark.asyncio
+async def test_delete_event_returns_false_when_not_found():
     mock_service = MagicMock()
     mock_service.events().delete().execute.side_effect = Exception("Not found")
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = delete_event(make_mock_creds(), "nonexistent")
-
-    assert result is False
+        result = await delete_event(make_mock_creds(), "nonexistent")
+        assert result is False
 
 
 # --- Attendee Tests (Via edit_event) ---
-
-
-def test_add_attendee_success():
+@pytest.mark.asyncio
+async def test_add_attendee_success():
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
@@ -257,31 +231,31 @@ def test_add_attendee_success():
         "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
         "attendees": [{"displayName": "test_user@uw.edu"}],
     }
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(
+        result = await edit_event(
             make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
         )
-    assert "test_user@uw.edu" in result.attendees
+        assert "test_user@uw.edu" in result.attendees
 
 
-def test_add_attendee_duplicate():
+@pytest.mark.asyncio
+async def test_add_attendee_duplicate():
     mock_service = MagicMock()
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"date": "2026-05-19"},
         "attendees": [{"displayName": "test_user@uw.edu"}],
     }
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(
+        result = await edit_event(
             make_mock_creds(), "abc123", add_attendee="test_user@uw.edu"
         )
-    assert result == "duplicate"
+        assert result == "duplicate"
 
 
-def test_remove_attendee_success():
-    mock_service = MagicMock()  # <--- MAKE SURE THIS LINE EXISTS HERE
+@pytest.mark.asyncio
+async def test_remove_attendee_success():
+    mock_service = MagicMock()
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"date": "2026-05-19"},
@@ -292,24 +266,23 @@ def test_remove_attendee_success():
         "start": {"date": "2026-05-19"},
         "attendees": [],
     }
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(
+        result = await edit_event(
             make_mock_creds(), "abc123", remove_attendee="test_user@uw.edu"
         )
-    assert result.attendees == []  # <--- Read the variable so flake8 is happy
+        assert result.attendees == []
 
 
-def test_remove_attendee_not_found():
-    mock_service = MagicMock()  # <--- MAKE SURE THIS LINE EXISTS HERE TOO
+@pytest.mark.asyncio
+async def test_remove_attendee_not_found():
+    mock_service = MagicMock()
     mock_service.events().get().execute.return_value = {
         "summary": "Scrum Meeting",
         "start": {"dateTime": "2026-05-01T12:00:00+00:00"},
         "attendees": [{"displayName": "test_user@uw.edu"}],
     }
-
     with patch("calendar_api.get_calendar_service", return_value=mock_service):
-        result = edit_event(
+        result = await edit_event(
             make_mock_creds(), "abc123", remove_attendee="missing_user@uw.edu"
         )
-    assert result == "not_found"
+        assert result == "not_found"

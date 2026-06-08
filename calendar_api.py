@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 from google.oauth2.credentials import Credentials as OAuth2Credentials

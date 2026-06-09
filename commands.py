@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from database import delete_token
 import discord
 from calendar_api import (
@@ -8,7 +9,8 @@ from calendar_api import (
     edit_event,
     Event,
 )
-from auth import get_auth_url, get_credentials
+from auth import get_auth_url, get_credentials_async
+from weather_api import get_weather_summary
 from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 from typing import TYPE_CHECKING
@@ -35,11 +37,11 @@ async def handle(parsed: ParsedCommand, message: discord.Message) -> str:
     return await handler(parsed.args, message)
 
 
-def _get_creds_or_error(
+async def _get_creds_or_error(
     message: discord.Message,
 ) -> tuple[OAuth2Credentials | None, str | None]:
     """Fetch credentials for the message author, or return an error string."""
-    creds = get_credentials(str(message.author.id))
+    creds = await get_credentials_async(str(message.author.id))
     if creds is None:
         return (
             None,
@@ -48,11 +50,11 @@ def _get_creds_or_error(
     return creds, None
 
 
-def _get_creds_or_error_by_discord_id(
+async def _get_creds_or_error_by_discord_id(
     discord_id: str,
 ) -> tuple[OAuth2Credentials | None, str | None]:
     """Fetch credentials for a Discord user ID, or return an error string."""
-    creds = get_credentials(discord_id)
+    creds = await get_credentials_async(discord_id)
     if creds is None:
         return (
             None,
@@ -81,7 +83,7 @@ async def info(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
         return "⚠️ **Missing date.** Please use: `@Simon/info-<date>` (MM.DD.YYYY)"
 
-    creds, error = _get_creds_or_error(message)
+    creds, error = await _get_creds_or_error(message)
     if error:
         return error
     assert creds is not None
@@ -107,7 +109,7 @@ async def add(args: list[str], message: discord.Message) -> str:
     if len(args) < 5:
         return "⚠️ **Invalid format.** Use: `@Simon/add-<title>-<date>-<time>-<location>-<description>`"
 
-    creds, error = _get_creds_or_error(message)
+    creds, error = await _get_creds_or_error(message)
     if error:
         return error
     assert creds is not None
@@ -133,7 +135,7 @@ async def edit(args: list[str], message: discord.Message) -> str:
     if len(args) < 3:
         return "⚠️ **Invalid format.** Please use: `@Simon/edit-<event_id>-<field>-<new_value>`"
 
-    creds, error = _get_creds_or_error(message)
+    creds, error = await _get_creds_or_error(message)
     if error:
         return error
     assert creds is not None
@@ -192,7 +194,7 @@ async def delete(args: list[str], message: discord.Message) -> str:
     if len(args) < 1:
         return "⚠️ **Missing Event.** Please use: `@Simon/delete-<event_id>`"
 
-    creds, error = _get_creds_or_error(message)
+    creds, error = await _get_creds_or_error(message)
     if error:
         return error
     assert creds is not None
@@ -238,19 +240,28 @@ async def unlink_slash(discord_id: str) -> str:
 
 
 async def info_slash(discord_id: str, date: str) -> str:
-    creds, error = _get_creds_or_error_by_discord_id(discord_id)
+    creds, error = await _get_creds_or_error_by_discord_id(discord_id)
 
     if error:
         return error
 
     assert creds is not None
 
-    events = await get_events_by_date(creds, date)
+    # Events need creds; the Seattle weather lookup doesn't -- run them
+    # concurrently so weather adds no extra latency to the response.
+    events, weather = await asyncio.gather(
+        get_events_by_date(creds, date),
+        get_weather_summary(date),
+    )
+
+    header = f"📅 **Events on {date}:**"
+    if weather:
+        header += f"\n🌦️ **Seattle:** {weather}"
 
     if not events:
-        return f"📅 No events found for **{date}**."
+        return f"{header}\n\nNo events found for this date."
 
-    lines = [f"📅 **Events on {date}:**\n"]
+    lines = [header, ""]
 
     for e in events:
         lines.append(
@@ -270,7 +281,7 @@ async def add_slash(
     location: str,
     description: str,
 ) -> str:
-    creds, error = _get_creds_or_error_by_discord_id(discord_id)
+    creds, error = await _get_creds_or_error_by_discord_id(discord_id)
 
     if error:
         return error
@@ -305,7 +316,7 @@ async def edit_slash(
     field_to_edit: str,
     new_value: str,
 ) -> str:
-    creds, error = _get_creds_or_error_by_discord_id(discord_id)
+    creds, error = await _get_creds_or_error_by_discord_id(discord_id)
 
     if error:
         return error
@@ -331,7 +342,7 @@ async def edit_slash(
 
 
 async def delete_slash(discord_id: str, event_id: str) -> str:
-    creds, error = _get_creds_or_error_by_discord_id(discord_id)
+    creds, error = await _get_creds_or_error_by_discord_id(discord_id)
 
     if error:
         return error

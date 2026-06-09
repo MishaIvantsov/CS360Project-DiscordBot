@@ -1,13 +1,21 @@
 from __future__ import annotations
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+import httplib2
+import google_auth_httplib2
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
 CALENDAR_ID = "primary"
+REQUEST_TIMEOUT = 10  # seconds; hard cap on each Google Calendar API call
 
 
 @dataclass
@@ -23,8 +31,17 @@ class Event:
 
 # --- Service Builder ---
 def get_calendar_service(creds: OAuth2Credentials):
-    """Build and return a Google Calendar service for a given user's credentials."""
-    return build("calendar", "v3", credentials=creds)
+    """Build a Calendar service whose HTTP transport times out per request.
+
+    Without a transport timeout, a stalled Google request blocks the worker
+    thread forever, the awaiting coroutine never returns, and the bot looks
+    stuck on "thinking". httplib2's timeout makes the call fail fast instead,
+    raising an exception the callers below turn into a clean sentinel.
+    """
+    authed_http = google_auth_httplib2.AuthorizedHttp(
+        creds, http=httplib2.Http(timeout=REQUEST_TIMEOUT)
+    )
+    return build("calendar", "v3", http=authed_http)
 
 
 # --- Helpers ---
@@ -99,6 +116,7 @@ async def get_events_by_date(creds: OAuth2Credentials, date: str) -> list[Event]
         )
         return [_to_event(e) for e in result.get("items", [])]
     except Exception:
+        logger.warning("get_events_by_date failed for %s", date, exc_info=True)
         return []
 
 
@@ -113,6 +131,7 @@ async def get_event_by_id(creds: OAuth2Credentials, event_id: str) -> Event | No
         )
         return _to_event(g_event)
     except Exception:
+        logger.warning("get_event_by_id failed for %s", event_id, exc_info=True)
         return None
 
 
@@ -128,6 +147,7 @@ async def add_event(creds: OAuth2Credentials, event: Event) -> Event | None:
         )
         return _to_event(created)
     except Exception:
+        logger.warning("add_event failed for %r", event.title, exc_info=True)
         return None
 
 
@@ -143,6 +163,7 @@ async def edit_event(
             .execute()
         )
     except Exception:
+        logger.warning("edit_event lookup failed for %s", event_id, exc_info=True)
         return None
 
     if "add_attendee" in kwargs or "remove_attendee" in kwargs:
@@ -190,6 +211,7 @@ async def edit_event(
         )
         return _to_event(updated)
     except Exception:
+        logger.warning("edit_event update failed for %s", event_id, exc_info=True)
         return None
 
 
@@ -204,4 +226,5 @@ async def delete_event(creds: OAuth2Credentials, event_id: str) -> bool:
         )
         return True
     except Exception:
+        logger.warning("delete_event failed for %s", event_id, exc_info=True)
         return False

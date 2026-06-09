@@ -1,13 +1,20 @@
 from __future__ import annotations
+import asyncio
+import logging
 import os
+
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials as OAuth2Credentials
 from google.auth.transport.requests import Request
+
 from database import get_token, save_token
+
+logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:8080")
 CLIENT_SECRETS_PATH = os.getenv("GOOGLE_CLIENT_SECRETS_PATH", "client_secrets.json")
+REQUEST_TIMEOUT = 10  # seconds for Google OAuth network calls
 
 # Store code verifiers in memory between auth URL generation and token exchange
 _pending_verifiers: dict[str, str] = {}
@@ -33,7 +40,12 @@ def get_auth_url(discord_id: str) -> str:
 
 
 def exchange_code(discord_id: str, code: str) -> None:
-    """Exchange an auth code for a token and save it to the database."""
+    """Exchange an auth code for a token and save it to the database.
+
+    Called from the OAuth callback server thread, so a hang here stalls the
+    user's browser rather than the Discord loop -- but we still bound it with
+    a timeout so the callback can't wait on Google indefinitely.
+    """
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_PATH,
         scopes=SCOPES,
@@ -42,14 +54,19 @@ def exchange_code(discord_id: str, code: str) -> None:
     )
     # Restore the code verifier from when the auth URL was generated
     flow.code_verifier = _pending_verifiers.pop(discord_id, None)
-    flow.fetch_token(code=code)
+    flow.fetch_token(code=code, timeout=REQUEST_TIMEOUT)
     token = flow.credentials
     assert isinstance(token, OAuth2Credentials)
     save_token(discord_id, _credentials_to_dict(token))
 
 
 def get_credentials(discord_id: str) -> OAuth2Credentials | None:
-    """Load a user's credentials from the DB, refreshing if expired."""
+    """Load a user's credentials from the DB, refreshing if expired.
+
+    NOTE: this is synchronous and the refresh makes a blocking network call.
+    Call it from async command handlers via get_credentials_async (below) so
+    it never blocks the event loop.
+    """
     token_data = get_token(discord_id)
     if token_data is None:
         return None
@@ -64,10 +81,21 @@ def get_credentials(discord_id: str) -> OAuth2Credentials | None:
     )
 
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        try:
+            creds.refresh(Request())
+        except Exception:
+            # Refresh token revoked/expired or a transport failure: treat as
+            # "not authorized" so the caller can re-prompt instead of crashing.
+            logger.warning("Token refresh failed for %s", discord_id, exc_info=True)
+            return None
         save_token(discord_id, _credentials_to_dict(creds))
 
     return creds
+
+
+async def get_credentials_async(discord_id: str) -> OAuth2Credentials | None:
+    """Async wrapper: runs the blocking refresh off the event loop."""
+    return await asyncio.to_thread(get_credentials, discord_id)
 
 
 def _credentials_to_dict(creds: OAuth2Credentials) -> dict:

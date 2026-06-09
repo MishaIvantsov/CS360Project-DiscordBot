@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 import re
 import threading
@@ -13,6 +15,10 @@ import commands
 from auth import exchange_code
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+COMMAND_TIMEOUT = 20  # seconds; hard cap on how long a command may run
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -66,6 +72,30 @@ def start_callback_server():
     server.serve_forever()
 
 
+# --- Helpers ---
+
+
+async def _run(coro):
+    """Run a command coroutine with a hard timeout.
+
+    A timeout raises asyncio.TimeoutError, which the tree error handler turns
+    into a user-facing message -- so a stalled Google call resolves the
+    "thinking..." state instead of hanging forever.
+    """
+    return await asyncio.wait_for(coro, timeout=COMMAND_TIMEOUT)
+
+
+def make_embed(title: str, description: str, color=discord.Color.blue()):
+    """Build a standard Simon embed."""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+    )
+    embed.set_footer(text="Simon Calendar Assistant")
+    return embed
+
+
 # --- Discord Bot ---
 
 
@@ -76,18 +106,7 @@ async def on_ready():
     print("Slash commands synced.")
 
 
-# UI embed helper
-def make_embed(title: str, description: str, color=discord.Color.blue()):
-    embed = discord.Embed(
-        title=title,
-        description=description,
-        color=color,
-    )
-    embed.set_footer(text="Simon Calendar Assistant")
-    return embed
-
-
-# Legacy @Simon function
+# Legacy @Simon mention handler
 @client.event
 async def on_message(message: discord.Message):
     if message.author.bot:
@@ -97,8 +116,44 @@ async def on_message(message: discord.Message):
         return
 
     text = re.sub(r"<@!?\d+>", "@Simon", message.content).strip()
-    response = await command_parser.parse(text, message)
-    await message.reply(response)
+
+    try:
+        response = await _run(command_parser.parse(text, message))
+    except asyncio.TimeoutError:
+        response = "⏳ That took too long — please try again."
+    except Exception:
+        logger.warning("legacy command failed", exc_info=True)
+        response = "❌ Couldn't handle that — check your input and try again."
+
+    # Discord rejects empty messages; only reply when there's something to say.
+    if response:
+        await message.reply(response)
+
+
+# --- Slash Command Error Handler ---
+
+
+@tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    # discord.py wraps the real exception in CommandInvokeError.
+    original = getattr(error, "original", error)
+
+    if isinstance(original, asyncio.TimeoutError):
+        msg = "⏳ That took too long — please try again."
+    else:
+        msg = "❌ Couldn't handle that — check your input and try again."
+
+    logger.warning("slash command failed", exc_info=original)
+
+    try:
+        if interaction.response.is_done():  # we already deferred / responded
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+    except discord.HTTPException:
+        logger.warning("failed to deliver error message", exc_info=True)
 
 
 # --- Slash Commands ---
@@ -143,7 +198,7 @@ async def unlink_command(interaction: discord.Interaction):
 async def info_command(interaction: discord.Interaction, date: str):
     await interaction.response.defer()
 
-    response = await commands.info_slash(str(interaction.user.id), date)
+    response = await _run(commands.info_slash(str(interaction.user.id), date))
 
     await interaction.followup.send(embed=make_embed("Calendar Info", response))
 
@@ -166,13 +221,15 @@ async def add_command(
 ):
     await interaction.response.defer()
 
-    response = await commands.add_slash(
-        str(interaction.user.id),
-        title,
-        date,
-        time,
-        location,
-        description,
+    response = await _run(
+        commands.add_slash(
+            str(interaction.user.id),
+            title,
+            date,
+            time,
+            location,
+            description,
+        )
     )
 
     await interaction.followup.send(
@@ -203,11 +260,13 @@ async def edit_command(
 ):
     await interaction.response.defer()
 
-    response = await commands.edit_slash(
-        str(interaction.user.id),
-        event_id,
-        field.value,
-        new_value,
+    response = await _run(
+        commands.edit_slash(
+            str(interaction.user.id),
+            event_id,
+            field.value,
+            new_value,
+        )
     )
 
     await interaction.followup.send(embed=make_embed("Edit Event", response))
@@ -218,7 +277,7 @@ async def edit_command(
 async def delete_command(interaction: discord.Interaction, event_id: str):
     await interaction.response.defer()
 
-    response = await commands.delete_slash(str(interaction.user.id), event_id)
+    response = await _run(commands.delete_slash(str(interaction.user.id), event_id))
 
     await interaction.followup.send(
         embed=make_embed("Delete Event", response, discord.Color.red())

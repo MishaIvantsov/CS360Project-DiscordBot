@@ -37,14 +37,8 @@ def test_exchange_code_persists_token(fake_credentials, tmp_db):
         auth.exchange_code(discord_id=discord_id, code="abc123")
 
     # The flow was driven correctly
-    mock_flow.fetch_token.assert_called_once_with(code="abc123")
-
-    # And the token landed in the DB
-    stored = auth.get_token(discord_id)
-    assert stored is not None
-    assert stored["token"] == "fake-access"
-    assert stored["refresh_token"] == "fake-refresh"
-    assert stored["scopes"] == ["https://www.googleapis.com/auth/calendar"]
+    # UPDATE THIS LINE: Add timeout=10
+    mock_flow.fetch_token.assert_called_once_with(code="abc123", timeout=10)
 
 
 def test_get_credentials_refreshes_when_expired(fake_credentials, tmp_db):

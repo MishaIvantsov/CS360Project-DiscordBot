@@ -15,6 +15,9 @@ from google.oauth2.credentials import Credentials as OAuth2Credentials
 
 from typing import TYPE_CHECKING
 
+import re
+from datetime import datetime, timedelta
+
 if TYPE_CHECKING:
     from command_parser import ParsedCommand
 
@@ -80,6 +83,14 @@ async def unlink(args: list[str], message: discord.Message) -> str:
 
 
 async def info(args: list[str], message: discord.Message) -> str:
+    if not args or (len(args) == 1 and args[0] == ""):
+        return (
+            "⚠️ **Missing criteria.** Please use: \n"
+            "`@Simon/info-<MM.DD.YYYY>` \n"
+            "'@Simon/info-today' \n"
+            "'@Simon/info-this-week-Joe' \n"
+            "'@Simon/info-07.01.2025:07.31.2025'"
+        )
     if len(args) < 1:
         return "⚠️ **Missing date.** Please use: `@Simon/info-<date>` (MM.DD.YYYY)"
 
@@ -88,6 +99,132 @@ async def info(args: list[str], message: discord.Message) -> str:
         return error
     assert creds is not None
 
+    range_pattern = r"^(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$"
+    single_date_pattern = r"^\d{2}\.\d{2}\.\d{4}$"
+
+    start_date = None
+    end_date = None
+    attendee_filter = None
+    active_filters = []
+    today_dt = datetime.now()
+
+    for arg in args:
+        range_match = re.match(range_pattern, arg)
+        if range_match:
+            start_date = range_match.group(1)
+            end_date = range_match.group(2)
+            active_filters.append(f"Range: '{arg}'")
+            continue
+
+        if re.match(single_date_pattern, arg):
+            start_date = arg
+            active_filters.append(f"Date: '{arg}'")
+            continue
+
+        if arg == "today":
+            start_date = today_dt.strftime("%m.%d.%Y")
+            active_filters.append("Today")
+            continue
+        elif arg == "tomorrow":
+            tomorrow_dt = today_dt + timedelta(days=1)
+            start_date = tomorrow_dt.strftime("%m.%d.%Y")
+            active_filters.append("Tomorrow")
+            continue
+        elif arg == "this-week":
+            start_date = today_dt.strftime("%m.%d.%Y")
+            end_date = (today_dt + timedelta(days=7)).strftime("%m.%d.%Y")
+            active_filters.append("This Week")
+            continue
+
+        if arg.lower() == "me":
+            attendee_filter = message.author.name.lower()
+            active_filters.append(f" Attendee: '{message.author.name}' (me)")
+        else:
+            attendee_filter = arg.lower()
+            active_filters.append(f" Attendee: '{arg}'")
+
+    try:
+        fetch_date = start_date if start_date else today_dt.strftime("%m.%d.%Y")
+        events = get_events_by_date(creds, fetch_date, end_date=end_date)
+    except TypeError:
+        events = get_events_by_date(creds, start_date or today_dt.strftime("%m.%d.%Y"))
+
+    if not events:
+        filter_summary = ", ".join(active_filters) if active_filters else "'None'"
+        return f"📅 No events found for your criteria: {filter_summary}"
+
+    if attendee_filter:
+        filtered_events = []
+        matched_attendee_names = set()
+
+        for e in events:
+            attendees_list = getattr(e, "attendees", []) or []
+            for attendee in attendees_list:
+                attendee_str = str(attendee).lower()
+                if attendee_filter in attendee_str:
+                    filtered_events.append(e)
+                    matched_attendee_names.add(str(attendee))
+                    break
+
+        if len(matched_attendee_names) > 1:
+            names_found = ", ".join([f"'{n}'" for n in matched_attendee_names])
+            await message.channel.send(
+                f" Multiple matching attendees found: {names_found}. "
+                "Displaying merged results."
+            )
+
+        events = filtered_events
+
+        if not events:
+            return f" **No events found** containing attendee: '{attendee_filter}' inside this date range."
+
+    try:
+        events.sort(
+            key=lambda x: getattr(x, "time", "") or getattr(x, "start_time", "")
+        )
+    except (AttributeError, TypeError):
+        # Sorting failed, but events are still usable in their current order
+        pass
+
+    filter_header = " | ".join(active_filters) if active_filters else "Global Search"
+    embed = discord.Embed(
+        title="📅 Calendar Filter Output",
+        description=f"**Active Filters:** {filter_header}\n**Total Matches:** `{len(events)}` event(s)",
+        color=discord.Color.teal(),
+    )
+
+    display_limit = 10
+    truncated_events = events[:display_limit]
+
+    for index, e in enumerate(truncated_events, start=1):
+        location = (
+            getattr(e, "location", "No location specified") or "No location specified"
+        )
+        description = (
+            getattr(e, "description", "No details provided") or "No details provided"
+        )
+        event_time = getattr(e, "time", "Unknown Time")
+
+        value_field = (
+            f"🕒**Time:** {event_time}\n"
+            f"📍 **Location:** {location}\n"
+            f"📝 **Details:** {description}"
+        )
+
+        embed.add_field(
+            name=f"{index}, {e.title} (ID: {e.id})",
+            value=value_field,
+            inline=False,
+        )
+
+    if len(events) > display_limit:
+        embed.set_footer(
+            text=f"Showing 1-{display_limit} of {len(events)} items. Use pagination to view more."
+        )
+
+    await message.channel.send(embed=embed)
+
+    return ""
     date_str = args[0]
     events = await get_events_by_date(creds, date_str)
 

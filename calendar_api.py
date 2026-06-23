@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 import httplib2
 import google_auth_httplib2
 from dotenv import load_dotenv
-from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials as OAuth2Credentials
+from googleapiclient.discovery import build
 
 load_dotenv()
 
@@ -58,8 +58,8 @@ def _to_event(g_event: dict) -> Event:
         date = dt.strftime("%m.%d.%Y")
         time = "All Day"
 
-    raw_attendees = g_event.get("attendees", [])
-    attendee_names = [a.get("displayName", a.get("email", "")) for a in raw_attendees]
+    g_attendees = g_event.get("attendees", [])
+    attendees_list = [a.get("displayName") or a.get("email", "") for a in g_attendees]
 
     return Event(
         id=g_event.get("id", ""),
@@ -68,7 +68,7 @@ def _to_event(g_event: dict) -> Event:
         time=time,
         location=g_event.get("location", ""),
         description=g_event.get("description", ""),
-        attendees=attendee_names,
+        attendees=attendees_list,
     )
 
 
